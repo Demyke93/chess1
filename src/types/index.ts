@@ -14,7 +14,7 @@ export interface Match {
   blackUsername: string;
   stake: number;
   status: 'pending' | 'active' | 'completed' | 'cancelled';
-  winner_id?: string;
+  winner?: string;
   timeControl: string;
   gameMode: string;
   lichessGameId?: string;
