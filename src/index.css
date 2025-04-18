@@ -1,92 +1,48 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 240 10% 7%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 240 10% 3%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 45 76% 58%;
+    --primary-foreground: 240 5% 10%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 240 5% 25%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 240 3% 15%;
+    --muted-foreground: 240 5% 65%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 45 76% 58%;
+    --accent-foreground: 240 5% 10%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 240 3% 20%;
+    --input: 240 3% 20%;
+    --ring: 45 76% 58%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 240 10% 7%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 45 76% 58%;
+    --sidebar-primary-foreground: 240 5% 10%;
+    --sidebar-accent: 240 5% 15%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 3% 20%;
+    --sidebar-ring: 45 76% 58%;
   }
 }
 
@@ -96,6 +52,18 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-chess-dark text-foreground;
   }
 }
+
+.chess-piece {
+  font-family: 'Chess', sans-serif;
+}
+
+@font-face {
+  font-family: 'Chess';
+  src: url("data:font/woff2;charset=utf-8;base64,d09GMgABAAAAAAS0AA8AAAAACTAAAARLAAEGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAG4gHIEsBmAAXAiBoRAKg2CDNwE2AiQDEAsOAAQgBYIDBzYbo30D5wksPZPd0qQWsWSrwRiL8GMukJsYf+89oG+sdA1LiIQo4KIhnKdNOrMdmoAIPog9/9+eVe9JyIZqYlpB2S0qPYGPUKWIgDHx/fsqC4YAyfd7DoDD23QfOwKCAUrtNQrWlA9slLEDHTrbdfn/e5nla4bT14UKaVr9zA9V9cVlH9qcuiiHnOJM+JxxXE7MJYXghDGQZZRzglGkCB4JKBhXQDXLyXdYPgC6wsCpnhjwBBigQKD7n3ymRFtRtyCQ+ywExDrfIP4BAQZAMlAAUGkXV7BkAwpwYcmXAzKLca7Iv15a9mZ0dGysrufbxWRMVm/bN2PZwZ81/g1q6yve4z8bYjPGkxoeHIDXCxTKbUqxx/eoVKu3HB4fR+uxNDltWzpJd8bvP+xu0Vk6qDSrHWqVWqu0qNUah1pt1NrHxw72tn0tB4baicWEbdHTNtatZzXq8bpHdXq9Zurpc49/wfxURNHEs31sI91CT6zD9jiLJ3HDjlZyeehysf7M8S767rAZGx3q7OxQNcX7YogMKVGY4PWeGZpRVXy6tbm1FRJFSYgxJklRBf5WSlx3qMFoRGajL0wbzbgEykWUuPIp0yq9sEg++OwoITSnAZ2GkA5JDW6Uocxs7DQmKmvz6lqbP44MlVbXN9vqHlZufDu2ZHx7YNnE0nS9GsW7098CvE+lkovqlSlJFreUKapqhetWKCtdo3kozVNRDVttlKdLV5XWrYXrzSpSrYmq8fR0c1fbE1UXeoXU2TR33ZfNHeMtX+zOn5PUxf3lb/CQp08+3V9Id47YGjeXL6g/sdRZccnm7NmrZqbPqqhfTm5iT2TrS+3Imd3vrbw7cWh+V+C/4z3DvzOvzK+NcTsnA4MDK0YGe/ammkrT9t7w4bE7BdGBRSH5hxLDy4e3xwWkNk0bi6WOBR07epv/lk0LjYMZ4U3L/52+ZkHRCWllwDf5K98vCB7865+31kcApf1JqS/bn9fe2AAAESsArP+/bu1ZtQSAhQAAgK3HJpWnJtdVchc2AUALQBQoBABFiACYBHIgwghAIiEZgOwjUq6SLvqBmeiAFCKLAACSsAAgDDsACXAbMMbcAonwCiATXgOQ/cdAfhEFNL9iL50orklqLSORi9QJLfQQa1bpCZjKb4PhHKpE4pcRE6hZrCCvVJI+Vj2w8lSOgD3WRypgG2PGSHlCvIS1JBgTQSSuu0gjG6xwUg0lq3qEVJQrRcqBVL4NAo4DlSLiLxNRQDULK0izXFJ0n1QNsOQxcUU6O6w/AkQBbA1kDAbkCsTlwFULyhDXXHZXRKQOY4x7h+QITsz+5E64XBQQBVCiTUtkBosnxo5ODVLswijAKRnyTAveSDOdXHjltyqKLg==") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+}
+
