@@ -9,13 +9,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { CoinConversionInfo } from '@/components/CoinConversionInfo';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FormEvent } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const WalletPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [amount, setAmount] = useState('');
+  const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
+  const [bankCode, setBankCode] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountName, setAccountName] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  const { data: wallet, isLoading } = useQuery({
+  const { data: wallet, isLoading, refetch } = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
       const { data: walletData, error: walletError } = await supabase
@@ -39,6 +47,42 @@ const WalletPage = () => {
     enabled: !!user,
   });
 
+  const { data: banks } = useQuery({
+    queryKey: ['banks'],
+    queryFn: async () => {
+      try {
+        const response = await fetch('https://api.paystack.co/bank');
+        const data = await response.json();
+        return data.status ? data.data : [];
+      } catch (error) {
+        console.error('Error fetching banks:', error);
+        return [];
+      }
+    },
+  });
+
+  const { data: conversionRate } = useQuery({
+    queryKey: ["conversionRate"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'currency_conversion')
+        .single();
+      
+      if (error) {
+        console.error("Error fetching conversion rate:", error);
+        return { naira_to_coin: 1000, min_deposit: 1000, min_withdrawal: 1000 };
+      }
+      
+      return data?.value || { naira_to_coin: 1000, min_deposit: 1000, min_withdrawal: 1000 };
+    }
+  });
+
+  const nairaRate = conversionRate?.naira_to_coin || 1000;
+  const minDeposit = conversionRate?.min_deposit || 1000;
+  const minWithdrawal = conversionRate?.min_withdrawal || 1000;
+
   const handleDeposit = async () => {
     if (!user) {
       toast({
@@ -58,16 +102,36 @@ const WalletPage = () => {
       return;
     }
 
+    const depositAmount = Number(amount);
+    if (isNaN(depositAmount) || depositAmount < minDeposit) {
+      toast({
+        title: 'Error',
+        description: `Minimum deposit amount is ₦${minDeposit.toLocaleString()}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const response = await supabase.functions.invoke('paystack', {
         body: { 
-          amount: Number(amount),
+          amount: depositAmount,
           email: user.email,
           type: 'deposit'
         },
       });
 
       if (response.data.status) {
+        // Create a pending transaction record
+        await supabase.from('transactions').insert({
+          wallet_id: wallet?.id,
+          amount: depositAmount / nairaRate, // Convert to coins
+          type: 'deposit',
+          status: 'pending',
+          reference: response.data.data.reference
+        });
+        
+        // Redirect to Paystack checkout
         window.location.href = response.data.data.authorization_url;
       } else {
         throw new Error('Failed to initialize payment');
@@ -81,7 +145,52 @@ const WalletPage = () => {
     }
   };
 
-  const handleWithdrawal = async () => {
+  const verifyAccount = async () => {
+    if (!accountNumber || !bankCode) {
+      toast({
+        title: 'Error',
+        description: 'Please enter your account number and select a bank',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const response = await fetch(`https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`, {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_PAYSTACK_PUBLIC_KEY}`
+        }
+      });
+      
+      const data = await response.json();
+      if (data.status) {
+        setAccountName(data.data.account_name);
+        toast({
+          title: 'Success',
+          description: 'Account verified successfully',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: data.message || 'Unable to verify account',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to verify account',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleWithdrawal = async (e: FormEvent) => {
+    e.preventDefault();
+    
     if (!user) {
       toast({
         title: 'Error',
@@ -93,31 +202,59 @@ const WalletPage = () => {
 
     try {
       const withdrawalAmount = Number(amount);
-      if (withdrawalAmount < 1000) {
-        throw new Error('Minimum withdrawal amount is ₦1,000');
+      if (isNaN(withdrawalAmount) || withdrawalAmount < minWithdrawal) {
+        throw new Error(`Minimum withdrawal amount is ₦${minWithdrawal.toLocaleString()}`);
       }
 
-      const coins = withdrawalAmount / 1000;
+      const coins = withdrawalAmount / nairaRate;
       if (wallet?.balance && coins > wallet.balance) {
         throw new Error('Insufficient coins for withdrawal');
+      }
+
+      if (!accountNumber || !bankCode || !accountName) {
+        throw new Error('Please verify your account details first');
       }
 
       const response = await supabase.functions.invoke('paystack', {
         body: { 
           amount: withdrawalAmount,
           email: user.email,
-          type: 'withdrawal'
+          type: 'withdrawal',
+          accountNumber,
+          bankCode
         },
       });
 
       if (response.data.status) {
+        // Create a transaction record
+        await supabase.from('transactions').insert({
+          wallet_id: wallet?.id,
+          amount: coins,
+          type: 'withdrawal',
+          status: 'processing',
+          payout_details: {
+            account_number: accountNumber,
+            bank_code: bankCode,
+            account_name: accountName,
+            reference: response.data.data.reference
+          }
+        });
+
+        // Update wallet balance
+        await supabase.from('wallets').update({
+          balance: (wallet?.balance || 0) - coins,
+          updated_at: new Date().toISOString()
+        }).eq('id', wallet?.id);
+
         toast({
           title: 'Success',
           description: 'Withdrawal request submitted successfully',
         });
         setAmount('');
+        setIsWithdrawalOpen(false);
+        refetch();
       } else {
-        throw new Error('Failed to process withdrawal');
+        throw new Error('Failed to process withdrawal: ' + (response.data.message || 'Unknown error'));
       }
     } catch (error) {
       toast({
@@ -129,7 +266,9 @@ const WalletPage = () => {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-chess-accent"></div>
+    </div>;
   }
 
   return (
@@ -160,56 +299,145 @@ const WalletPage = () => {
                 {isLoading ? 'Loading...' : `${wallet?.balance || 0} coins`}
               </div>
 
-              <Tabs defaultValue="deposit" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="deposit">Deposit</TabsTrigger>
-                  <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
-                </TabsList>
-                <TabsContent value="deposit" className="space-y-4">
-                  <div className="flex gap-4">
-                    <Input
-                      type="number"
-                      min="1000"
-                      step="1000"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="Amount in Naira (₦)"
-                    />
-                    <Button onClick={handleDeposit}>
-                      Deposit
-                    </Button>
-                  </div>
-                </TabsContent>
-                <TabsContent value="withdraw" className="space-y-4">
-                  <div className="flex gap-4">
-                    <Input
-                      type="number"
-                      min="1000"
-                      step="1000"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="Amount in Naira (₦)"
-                    />
-                    <Button 
-                      onClick={handleWithdrawal}
-                      disabled={wallet?.is_demo}
-                    >
-                      Withdraw
-                    </Button>
-                  </div>
-                  {wallet?.is_demo && (
-                    <p className="text-yellow-500 text-sm">
-                      Withdrawals are not available for demo accounts
-                    </p>
-                  )}
-                </TabsContent>
-              </Tabs>
+              {wallet?.is_demo ? (
+                <p className="text-yellow-400 text-sm">
+                  Demo accounts have coins for practice only and cannot participate in real matches.
+                </p>
+              ) : (
+                <Tabs defaultValue="deposit" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="deposit">Deposit</TabsTrigger>
+                    <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="deposit" className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Amount (₦)</label>
+                      <div className="flex gap-4">
+                        <Input
+                          type="number"
+                          min={minDeposit}
+                          step="100"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          placeholder={`Minimum: ₦${minDeposit.toLocaleString()}`}
+                        />
+                        <Button onClick={handleDeposit}>
+                          Deposit
+                        </Button>
+                      </div>
+                      {amount && !isNaN(Number(amount)) && (
+                        <p className="text-sm text-gray-400">
+                          You'll receive {(Number(amount) / nairaRate).toFixed(2)} coins
+                        </p>
+                      )}
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="withdraw" className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Amount (₦)</label>
+                      <div className="flex gap-4">
+                        <Input
+                          type="number"
+                          min={minWithdrawal}
+                          step="100"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          placeholder={`Minimum: ₦${minWithdrawal.toLocaleString()}`}
+                        />
+                        <Button 
+                          onClick={() => setIsWithdrawalOpen(true)}
+                        >
+                          Withdraw
+                        </Button>
+                      </div>
+                      {amount && !isNaN(Number(amount)) && (
+                        <p className="text-sm text-gray-400">
+                          Requires {(Number(amount) / nairaRate).toFixed(2)} coins from your balance
+                        </p>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              )}
             </div>
           </CardContent>
         </Card>
 
         <CoinConversionInfo />
       </div>
+
+      <Dialog open={isWithdrawalOpen} onOpenChange={setIsWithdrawalOpen}>
+        <DialogContent className="bg-chess-dark border-chess-brown text-white">
+          <DialogHeader>
+            <DialogTitle>Withdrawal</DialogTitle>
+            <DialogDescription>
+              Enter your bank account details to withdraw ₦{Number(amount).toLocaleString() || '0'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleWithdrawal} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Bank</label>
+              <Select value={bankCode} onValueChange={setBankCode}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a bank" />
+                </SelectTrigger>
+                <SelectContent>
+                  {banks?.map((bank) => (
+                    <SelectItem key={bank.code} value={bank.code}>
+                      {bank.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Account Number</label>
+              <Input
+                type="text"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder="Enter 10-digit account number"
+                maxLength={10}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={verifyAccount}
+                disabled={isVerifying || !bankCode || !accountNumber}
+              >
+                {isVerifying ? 'Verifying...' : 'Verify Account'}
+              </Button>
+              
+              {accountName && (
+                <div className="text-green-400 text-sm font-medium">
+                  {accountName}
+                </div>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setIsWithdrawalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={!accountName || !bankCode || !accountNumber}
+              >
+                Withdraw
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -18,12 +18,34 @@ serve(async (req) => {
   }
 
   try {
-    const { amount, email, type } = await req.json()
+    const { amount, email, type, accountNumber, bankCode } = await req.json()
     
     if (type === 'withdrawal') {
-      // For withdrawal requests, we'll create a transfer recipient and initiate transfer
-      // This is a simplified example - in production you'd want to verify bank details
-      const response = await fetch('https://api.paystack.co/transfer/callback', {
+      // For withdrawal requests, create a transfer recipient and initiate transfer
+      // First create a transfer recipient
+      const recipientResponse = await fetch('https://api.paystack.co/transferrecipient', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: "nuban",
+          name: email,
+          account_number: accountNumber,
+          bank_code: bankCode,
+          currency: "NGN"
+        })
+      })
+
+      const recipientData = await recipientResponse.json()
+      
+      if (!recipientData.status) {
+        throw new Error(recipientData.message || 'Failed to create transfer recipient')
+      }
+      
+      // Now initiate the transfer with the recipient code
+      const transferResponse = await fetch('https://api.paystack.co/transfer', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
@@ -32,17 +54,17 @@ serve(async (req) => {
         body: JSON.stringify({
           source: 'balance',
           amount: amount * 100, // Convert to kobo
-          recipient: email,
+          recipient: recipientData.data.recipient_code,
           reason: 'Withdrawal from ChessStake'
         })
       })
 
-      const data = await response.json()
-      return new Response(JSON.stringify(data), {
+      const transferData = await transferResponse.json()
+      return new Response(JSON.stringify(transferData), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } else {
-      // Handle deposits as before
+      // Handle deposits by initializing a payment
       const response = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
         headers: {

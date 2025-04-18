@@ -2,72 +2,17 @@
 import { User, Match } from '@/types';
 import { supabase } from "@/integrations/supabase/client";
 
-// Mock database for demo purposes
-let users: User[] = [
-  {
-    id: 'user_1',
-    username: 'ChessPlayer1',
-    balance: 1000,
-    avatar: '♔'
-  },
-  {
-    id: 'user_2',
-    username: 'ChessPlayer2',
-    balance: 1000,
-    avatar: '♕'
-  },
-  {
-    id: 'user_3',
-    username: 'GrandMaster',
-    balance: 5000,
-    avatar: '♚'
-  }
-];
-
-let matches: Match[] = [
-  {
-    id: 'match_1',
-    whitePlayerId: 'user_1',
-    blackPlayerId: 'user_2',
-    whiteUsername: 'ChessPlayer1',
-    blackUsername: 'ChessPlayer2',
-    stake: 100,
-    status: 'completed',
-    winner: 'user_1',
-    timeControl: '5+3',
-    gameMode: 'rapid',
-    lichessGameId: 'abc123',
-    createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-    updatedAt: new Date(Date.now() - 82800000).toISOString()
-  },
-  {
-    id: 'match_2',
-    whitePlayerId: 'user_3',
-    blackPlayerId: 'user_1',
-    whiteUsername: 'GrandMaster',
-    blackUsername: 'ChessPlayer1',
-    stake: 200,
-    status: 'completed',
-    winner: 'user_3',
-    timeControl: '3+2',
-    gameMode: 'blitz',
-    lichessGameId: 'def456',
-    createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-    updatedAt: new Date(Date.now() - 169200000).toISOString()
-  }
-];
-
-// Current user session (for demo)
+// Current user session
 let currentUser: User | null = null;
 
 export const userService = {
-  // Login user (in a real app, this would authenticate with backend)
+  // Login user
   login: async (username: string, password: string): Promise<User> => {
     try {
       // Try to authenticate with Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: `${username}@example.com`, // Using username as email for simplicity
-        password: password
+        password: password || 'demo123' // Default password for demo
       });
 
       if (authError) throw authError;
@@ -91,38 +36,30 @@ export const userService = {
           id: authData.user.id,
           username: profileData?.username || username,
           balance: walletData?.balance || 0,
-          avatar: profileData?.avatar_url || '♟'
+          avatar: profileData?.avatar_url || '♟',
+          email: authData.user.email
         };
           
         currentUser = user;
         return user;
       }
+      
+      throw new Error("Authentication failed");
     } catch (error) {
       console.error("Login error:", error);
+      
+      // For demo purposes, create a demo account if auth fails
+      const newUser: User = {
+        id: `demo_${Math.random().toString(36).substr(2, 9)}`,
+        username,
+        balance: 1000, // Demo accounts start with 1000 coins
+        avatar: '♟', // Default avatar
+        email: `${username}@example.com`
+      };
+      
+      currentUser = newUser;
+      return newUser;
     }
-
-    // Fallback to demo login if Supabase auth fails or for demo accounts
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-        
-        if (user) {
-          currentUser = user;
-          resolve(user);
-        } else {
-          // Create a new demo user if not found
-          const newUser: User = {
-            id: `user_${Math.random().toString(36).substr(2, 9)}`,
-            username,
-            balance: 1000,
-            avatar: '♟' // Default avatar
-          };
-          users.push(newUser);
-          currentUser = newUser;
-          resolve(newUser);
-        }
-      }, 500);
-    });
   },
 
   // Get current user
@@ -151,7 +88,8 @@ export const userService = {
           id: userId,
           username: profileData?.username || 'User',
           balance: walletData?.balance || 0,
-          avatar: profileData?.avatar_url || '♟'
+          avatar: profileData?.avatar_url || '♟',
+          email: session.session.user.email
         };
           
         currentUser = user;
@@ -182,139 +120,317 @@ export const userService = {
   },
 
   // Get user by ID
-  getUserById: (id: string): Promise<User | null> => {
-    return new Promise((resolve) => {
-      const user = users.find(u => u.id === id);
-      resolve(user || null);
-    });
+  getUserById: async (id: string): Promise<User | null> => {
+    try {
+      // Check if this is a demo ID
+      if (id.startsWith('demo_')) {
+        return currentUser && currentUser.id === id ? currentUser : null;
+      }
+      
+      // Get user from Supabase
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('username, avatar_url, is_demo')
+        .eq('id', id)
+        .single();
+        
+      if (profileError) throw profileError;
+      
+      // Get wallet info
+      const { data: walletData, error: walletError } = await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', id)
+        .single();
+        
+      if (walletError) throw walletError;
+      
+      return {
+        id,
+        username: profileData.username || 'User',
+        balance: walletData.balance || 0,
+        avatar: profileData.avatar_url || '♟'
+      };
+      
+    } catch (error) {
+      console.error("Get user by ID error:", error);
+      return null;
+    }
   },
 
   // Get all users
-  getAllUsers: (): Promise<User[]> => {
-    return Promise.resolve(users);
+  getAllUsers: async (): Promise<User[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .eq('is_demo', false)
+        .limit(100);
+        
+      if (error) throw error;
+      
+      const users = await Promise.all(data.map(async (profile) => {
+        const { data: walletData } = await supabase
+          .from('wallets')
+          .select('balance')
+          .eq('user_id', profile.id)
+          .single();
+          
+        return {
+          id: profile.id,
+          username: profile.username || 'User',
+          balance: walletData?.balance || 0,
+          avatar: profile.avatar_url || '♟'
+        };
+      }));
+      
+      return users;
+    } catch (error) {
+      console.error("Get all users error:", error);
+      return [];
+    }
   },
 
   // Update user balance
-  updateBalance: (userId: string, amount: number): Promise<User> => {
-    return new Promise((resolve, reject) => {
-      const userIndex = users.findIndex(u => u.id === userId);
+  updateBalance: async (userId: string, amount: number): Promise<User> => {
+    try {
+      // Check if this is a demo ID
+      if (userId.startsWith('demo_')) {
+        if (currentUser && currentUser.id === userId) {
+          currentUser.balance += amount;
+          return currentUser;
+        }
+        throw new Error('Demo user not found');
+      }
       
-      if (userIndex === -1) {
-        reject(new Error('User not found'));
-        return;
-      }
-
-      users[userIndex] = {
-        ...users[userIndex],
-        balance: users[userIndex].balance + amount
-      };
-
-      if (currentUser && currentUser.id === userId) {
-        currentUser = users[userIndex];
-      }
-
-      resolve(users[userIndex]);
-    });
+      // Update balance in Supabase
+      const { data: walletData, error: walletError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+        
+      if (walletError) throw walletError;
+      
+      const newBalance = (walletData.balance || 0) + amount;
+      
+      const { error: updateError } = await supabase
+        .from('wallets')
+        .update({ 
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', walletData.id);
+        
+      if (updateError) throw updateError;
+      
+      // Get updated user
+      const user = await userService.getUserById(userId);
+      if (!user) throw new Error('Failed to get updated user');
+      
+      return user;
+    } catch (error) {
+      console.error("Update balance error:", error);
+      throw error;
+    }
   },
 
   // Create a match
-  createMatch: (match: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>): Promise<Match> => {
-    return new Promise((resolve) => {
-      const now = new Date().toISOString();
-      const newMatch: Match = {
-        id: `match_${Math.random().toString(36).substr(2, 9)}`,
-        ...match,
-        createdAt: now,
-        updatedAt: now
+  createMatch: async (match: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>): Promise<Match> => {
+    try {
+      // Check if this involves demo users
+      if (match.whitePlayerId.startsWith('demo_') || match.blackPlayerId.startsWith('demo_')) {
+        const now = new Date().toISOString();
+        const newMatch: Match = {
+          id: `demo_match_${Math.random().toString(36).substr(2, 9)}`,
+          ...match,
+          createdAt: now,
+          updatedAt: now
+        };
+        return newMatch;
+      }
+      
+      // Create match in Supabase
+      const { data, error } = await supabase
+        .from('matches')
+        .insert({
+          white_player_id: match.whitePlayerId,
+          black_player_id: match.blackPlayerId,
+          stake_amount: match.stake,
+          status: match.status,
+          time_control: parseInt(match.timeControl),
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      return {
+        id: data.id,
+        whitePlayerId: data.white_player_id,
+        blackPlayerId: data.black_player_id,
+        whiteUsername: match.whiteUsername,
+        blackUsername: match.blackUsername,
+        stake: data.stake_amount,
+        status: data.status,
+        timeControl: match.timeControl,
+        gameMode: match.gameMode,
+        lichessGameId: match.lichessGameId,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at || data.created_at
       };
-
-      matches.push(newMatch);
-      resolve(newMatch);
-    });
+    } catch (error) {
+      console.error("Create match error:", error);
+      throw error;
+    }
   },
 
   // Get all matches for a user
   getUserMatches: async (userId: string): Promise<Match[]> => {
-    // Check if the user is a demo account
     try {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('is_demo')
-        .eq('id', userId)
-        .single();
-        
-      if (profileData?.is_demo === false) {
-        // For real accounts, get data from the database
-        const { data, error } = await supabase
-          .from('matches')
-          .select('*')
-          .or(`white_player_id.eq.${userId},black_player_id.eq.${userId}`)
-          .order('created_at', { ascending: false });
-          
-        if (error) {
-          console.error("Error fetching matches:", error);
-          return [];
-        }
-        
-        return data || [];
+      // Check if this is a demo ID
+      if (userId.startsWith('demo_')) {
+        return [];
       }
+      
+      // Get matches from Supabase
+      const { data, error } = await supabase
+        .from('matches')
+        .select(`
+          *,
+          white_player:white_player_id(username),
+          black_player:black_player_id(username)
+        `)
+        .or(`white_player_id.eq.${userId},black_player_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
+          
+      if (error) throw error;
+      
+      return data.map(match => ({
+        id: match.id,
+        whitePlayerId: match.white_player_id,
+        blackPlayerId: match.black_player_id,
+        whiteUsername: match.white_player?.username || 'Unknown',
+        blackUsername: match.black_player?.username || 'Unknown',
+        stake: match.stake_amount,
+        status: match.status,
+        winner: match.winner_id,
+        timeControl: match.time_control.toString(),
+        gameMode: match.time_control <= 5 ? 'blitz' : 'rapid',
+        lichessGameId: match.pgn,
+        createdAt: match.created_at,
+        updatedAt: match.updated_at || match.created_at
+      }));
     } catch (error) {
-      console.error("Error checking if user is demo:", error);
+      console.error("Get user matches error:", error);
+      return [];
     }
-    
-    // Fallback to demo data
-    return new Promise((resolve) => {
-      const userMatches = matches.filter(
-        m => m.whitePlayerId === userId || m.blackPlayerId === userId
-      );
-      resolve(userMatches);
-    });
   },
 
   // Complete a match and handle stake transfers
-  completeMatch: (matchId: string, winnerId: string | null): Promise<Match> => {
-    return new Promise(async (resolve, reject) => {
-      const matchIndex = matches.findIndex(m => m.id === matchId);
-      
-      if (matchIndex === -1) {
-        reject(new Error('Match not found'));
-        return;
+  completeMatch: async (matchId: string, winnerId: string | null): Promise<Match> => {
+    try {
+      // Check if this is a demo match
+      if (matchId.startsWith('demo_match_')) {
+        throw new Error('Demo matches cannot be completed');
       }
-
-      const match = matches[matchIndex];
       
-      if (match.status === 'completed') {
-        reject(new Error('Match already completed'));
-        return;
+      // Get match from Supabase
+      const { data: matchData, error: matchError } = await supabase
+        .from('matches')
+        .select(`
+          *,
+          white_player:white_player_id(username),
+          black_player:black_player_id(username)
+        `)
+        .eq('id', matchId)
+        .single();
+        
+      if (matchError) throw matchError;
+      
+      if (matchData.status === 'completed') {
+        throw new Error('Match already completed');
       }
-
+      
       // Update match status
-      const updatedMatch: Match = {
-        ...match,
-        status: 'completed',
-        winner: winnerId || undefined,
-        updatedAt: new Date().toISOString()
-      };
+      const { error: updateError } = await supabase
+        .from('matches')
+        .update({
+          status: 'completed',
+          winner_id: winnerId,
+          updated_at: new Date().toISOString(),
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', matchId);
+        
+      if (updateError) throw updateError;
       
-      matches[matchIndex] = updatedMatch;
-
       // Handle stake transfers if there's a winner
       if (winnerId) {
-        const loserId = winnerId === match.whitePlayerId ? match.blackPlayerId : match.whitePlayerId;
+        const loserId = winnerId === matchData.white_player_id ? matchData.black_player_id : matchData.white_player_id;
         
         // Credit winner
-        await userService.updateBalance(winnerId, match.stake);
+        await userService.updateBalance(winnerId, matchData.stake_amount);
         
         // Debit loser
-        await userService.updateBalance(loserId, -match.stake);
+        await userService.updateBalance(loserId, -matchData.stake_amount);
       }
-
-      resolve(updatedMatch);
-    });
+      
+      return {
+        id: matchData.id,
+        whitePlayerId: matchData.white_player_id,
+        blackPlayerId: matchData.black_player_id,
+        whiteUsername: matchData.white_player?.username || 'Unknown',
+        blackUsername: matchData.black_player?.username || 'Unknown',
+        stake: matchData.stake_amount,
+        status: 'completed',
+        winner: winnerId,
+        timeControl: matchData.time_control.toString(),
+        gameMode: matchData.time_control <= 5 ? 'blitz' : 'rapid',
+        lichessGameId: matchData.pgn,
+        createdAt: matchData.created_at,
+        updatedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error("Complete match error:", error);
+      throw error;
+    }
   },
 
   // Get all matches
-  getAllMatches: (): Promise<Match[]> => {
-    return Promise.resolve([...matches].reverse());
+  getAllMatches: async (): Promise<Match[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('matches')
+        .select(`
+          *,
+          white_player:white_player_id(username),
+          black_player:black_player_id(username)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(50);
+          
+      if (error) throw error;
+      
+      return data.map(match => ({
+        id: match.id,
+        whitePlayerId: match.white_player_id,
+        blackPlayerId: match.black_player_id,
+        whiteUsername: match.white_player?.username || 'Unknown',
+        blackUsername: match.black_player?.username || 'Unknown',
+        stake: match.stake_amount,
+        status: match.status,
+        winner: match.winner_id,
+        timeControl: match.time_control.toString(),
+        gameMode: match.time_control <= 5 ? 'blitz' : 'rapid',
+        lichessGameId: match.pgn,
+        createdAt: match.created_at,
+        updatedAt: match.updated_at || match.created_at
+      }));
+    } catch (error) {
+      console.error("Get all matches error:", error);
+      return [];
+    }
   }
 };
