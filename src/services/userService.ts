@@ -1,4 +1,3 @@
-
 import { User, Match } from '@/types';
 import { supabase } from "@/integrations/supabase/client";
 
@@ -294,28 +293,37 @@ export const userService = {
         return [];
       }
       
-      // Get matches from Supabase
+      // Get matches from Supabase with proper join syntax
       const { data, error } = await supabase
         .from('matches')
         .select(`
-          *,
-          white_player:white_player_id(username),
-          black_player:black_player_id(username)
+          id,
+          white_player_id,
+          black_player_id,
+          profiles!matches_white_player_id_fkey(username),
+          profiles!matches_black_player_id_fkey(username),
+          stake_amount,
+          status,
+          winner_id,
+          time_control,
+          pgn,
+          created_at,
+          updated_at
         `)
         .or(`white_player_id.eq.${userId},black_player_id.eq.${userId}`)
         .order('created_at', { ascending: false });
-          
+        
       if (error) throw error;
       
       return data.map(match => ({
         id: match.id,
         whitePlayerId: match.white_player_id,
         blackPlayerId: match.black_player_id,
-        whiteUsername: match.white_player?.username || 'Unknown',
-        blackUsername: match.black_player?.username || 'Unknown',
+        whiteUsername: match.profiles!matches_white_player_id_fkey.username,
+        blackUsername: match.profiles!matches_black_player_id_fkey.username,
         stake: match.stake_amount,
-        status: match.status,
-        winner: match.winner_id,
+        status: match.status as Match['status'],
+        winner_id: match.winner_id,
         timeControl: match.time_control.toString(),
         gameMode: match.time_control <= 5 ? 'blitz' : 'rapid',
         lichessGameId: match.pgn,
@@ -340,9 +348,18 @@ export const userService = {
       const { data: matchData, error: matchError } = await supabase
         .from('matches')
         .select(`
-          *,
-          white_player:white_player_id(username),
-          black_player:black_player_id(username)
+          id,
+          white_player_id,
+          black_player_id,
+          profiles!matches_white_player_id_fkey(username),
+          profiles!matches_black_player_id_fkey(username),
+          stake_amount,
+          status,
+          winner_id,
+          time_control,
+          pgn,
+          created_at,
+          updated_at
         `)
         .eq('id', matchId)
         .single();
@@ -404,24 +421,33 @@ export const userService = {
       const { data, error } = await supabase
         .from('matches')
         .select(`
-          *,
-          white_player:white_player_id(username),
-          black_player:black_player_id(username)
+          id,
+          white_player_id,
+          black_player_id,
+          profiles!matches_white_player_id_fkey(username),
+          profiles!matches_black_player_id_fkey(username),
+          stake_amount,
+          status,
+          winner_id,
+          time_control,
+          pgn,
+          created_at,
+          updated_at
         `)
         .order('created_at', { ascending: false })
         .limit(50);
-          
+        
       if (error) throw error;
       
       return data.map(match => ({
         id: match.id,
         whitePlayerId: match.white_player_id,
         blackPlayerId: match.black_player_id,
-        whiteUsername: match.white_player?.username || 'Unknown',
-        blackUsername: match.black_player?.username || 'Unknown',
+        whiteUsername: match.profiles!matches_white_player_id_fkey.username,
+        blackUsername: match.profiles!matches_black_player_id_fkey.username,
         stake: match.stake_amount,
-        status: match.status,
-        winner: match.winner_id,
+        status: match.status as Match['status'],
+        winner_id: match.winner_id,
         timeControl: match.time_control.toString(),
         gameMode: match.time_control <= 5 ? 'blitz' : 'rapid',
         lichessGameId: match.pgn,
