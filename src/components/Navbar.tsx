@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,6 @@ export const Navbar = () => {
           <span className="text-2xl text-chess-accent font-bold">♔ ChessStake</span>
         </Link>
         
-        {/* Mobile menu button */}
         <button 
           className="md:hidden text-white"
           onClick={toggleMobileMenu}
@@ -28,7 +26,6 @@ export const Navbar = () => {
           {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
         
-        {/* Desktop menu */}
         <div className="hidden md:flex items-center space-x-6">
           <Link to="/" className="text-white hover:text-chess-accent transition-colors">
             Home
@@ -38,6 +35,9 @@ export const Navbar = () => {
           </Link>
           <Link to="/leaderboard" className="text-white hover:text-chess-accent transition-colors">
             Leaderboard
+          </Link>
+          <Link to="/wallet" className="text-white hover:text-chess-accent transition-colors">
+            Wallet
           </Link>
           
           {user ? (
@@ -63,7 +63,6 @@ export const Navbar = () => {
         </div>
       </div>
       
-      {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-chess-dark mt-2 px-4 py-2 border-t border-chess-brown">
           <Link to="/" className="block py-2 text-white hover:text-chess-accent" onClick={toggleMobileMenu}>
@@ -74,6 +73,9 @@ export const Navbar = () => {
           </Link>
           <Link to="/leaderboard" className="block py-2 text-white hover:text-chess-accent" onClick={toggleMobileMenu}>
             Leaderboard
+          </Link>
+          <Link to="/wallet" className="block py-2 text-white hover:text-chess-accent" onClick={toggleMobileMenu}>
+            Wallet
           </Link>
           
           {user ? (

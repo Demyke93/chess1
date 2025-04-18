@@ -7,15 +7,17 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { CoinConversionInfo } from '@/components/CoinConversionInfo';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FormEvent } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ArrowUpFromLine, ArrowDownToLine } from 'lucide-react';
 
 const WalletPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [amount, setAmount] = useState('');
+  const [transactionType, setTransactionType] = useState<'deposit' | 'withdraw'>('deposit');
   const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
   const [bankCode, setBankCode] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
@@ -304,65 +306,51 @@ const WalletPage = () => {
                 {isLoading ? 'Loading...' : `${wallet?.balance || 0} coins`}
               </div>
 
-              {wallet?.is_demo ? (
-                <p className="text-yellow-400 text-sm">
-                  Demo accounts have coins for practice only and cannot participate in real matches.
-                </p>
-              ) : (
-                <Tabs defaultValue="deposit" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="deposit">Deposit</TabsTrigger>
-                    <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="deposit" className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Amount (₦)</label>
-                      <div className="flex gap-4">
-                        <Input
-                          type="number"
-                          min={minDeposit}
-                          step="100"
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
-                          placeholder={`Minimum: ₦${minDeposit.toLocaleString()}`}
-                        />
-                        <Button onClick={handleDeposit}>
-                          Deposit
-                        </Button>
-                      </div>
-                      {amount && !isNaN(Number(amount)) && (
-                        <p className="text-sm text-gray-400">
-                          You'll receive {(Number(amount) / nairaRate).toFixed(2)} coins
-                        </p>
-                      )}
+              {!wallet?.is_demo && (
+                <div className="space-y-4">
+                  <ToggleGroup
+                    type="single"
+                    value={transactionType}
+                    onValueChange={(value) => value && setTransactionType(value as 'deposit' | 'withdraw')}
+                    className="justify-start"
+                  >
+                    <ToggleGroupItem value="deposit" className="flex items-center gap-2">
+                      <ArrowUpFromLine className="w-4 h-4" />
+                      Deposit
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="withdraw" className="flex items-center gap-2">
+                      <ArrowDownToLine className="w-4 h-4" />
+                      Withdraw
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Amount (₦)</label>
+                    <div className="flex gap-4">
+                      <Input
+                        type="number"
+                        min={transactionType === 'deposit' ? minDeposit : minWithdrawal}
+                        step="100"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder={`Minimum: ₦${(transactionType === 'deposit' ? minDeposit : minWithdrawal).toLocaleString()}`}
+                      />
+                      <Button 
+                        onClick={transactionType === 'deposit' ? handleDeposit : () => setIsWithdrawalOpen(true)}
+                      >
+                        {transactionType === 'deposit' ? 'Deposit' : 'Withdraw'}
+                      </Button>
                     </div>
-                  </TabsContent>
-                  <TabsContent value="withdraw" className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Amount (₦)</label>
-                      <div className="flex gap-4">
-                        <Input
-                          type="number"
-                          min={minWithdrawal}
-                          step="100"
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
-                          placeholder={`Minimum: ₦${minWithdrawal.toLocaleString()}`}
-                        />
-                        <Button 
-                          onClick={() => setIsWithdrawalOpen(true)}
-                        >
-                          Withdraw
-                        </Button>
-                      </div>
-                      {amount && !isNaN(Number(amount)) && (
-                        <p className="text-sm text-gray-400">
-                          Requires {(Number(amount) / nairaRate).toFixed(2)} coins from your balance
-                        </p>
-                      )}
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                    {amount && !isNaN(Number(amount)) && (
+                      <p className="text-sm text-gray-400">
+                        {transactionType === 'deposit' 
+                          ? `You'll receive ${(Number(amount) / nairaRate).toFixed(2)} coins`
+                          : `Requires ${(Number(amount) / nairaRate).toFixed(2)} coins from your balance`
+                        }
+                      </p>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </CardContent>
