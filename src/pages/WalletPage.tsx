@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -72,16 +71,22 @@ const WalletPage = () => {
       
       if (error) {
         console.error("Error fetching conversion rate:", error);
-        return { naira_to_coin: 1000, min_deposit: 1000, min_withdrawal: 1000 };
+        return { value: { naira_to_coin: 1000, min_deposit: 1000, min_withdrawal: 1000 } };
       }
       
-      return data?.value || { naira_to_coin: 1000, min_deposit: 1000, min_withdrawal: 1000 };
+      return data || { value: { naira_to_coin: 1000, min_deposit: 1000, min_withdrawal: 1000 } };
     }
   });
 
-  const nairaRate = conversionRate?.naira_to_coin || 1000;
-  const minDeposit = conversionRate?.min_deposit || 1000;
-  const minWithdrawal = conversionRate?.min_withdrawal || 1000;
+  const nairaRate = typeof conversionRate?.value === 'object' 
+    ? (conversionRate.value as any).naira_to_coin || 1000 
+    : 1000;
+  const minDeposit = typeof conversionRate?.value === 'object' 
+    ? (conversionRate.value as any).min_deposit || 1000 
+    : 1000;
+  const minWithdrawal = typeof conversionRate?.value === 'object' 
+    ? (conversionRate.value as any).min_withdrawal || 1000 
+    : 1000;
 
   const handleDeposit = async () => {
     if (!user) {

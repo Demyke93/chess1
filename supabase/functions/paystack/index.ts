@@ -12,7 +12,7 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
+  const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY') || 'sk_test_15e8f8988e2fb1529ab6f0584fceb3dcc903d92d'
   if (!PAYSTACK_SECRET_KEY) {
     throw new Error('PAYSTACK_SECRET_KEY is not set')
   }
@@ -21,7 +21,6 @@ serve(async (req) => {
     const { amount, email, type, accountNumber, bankCode } = await req.json()
     
     if (type === 'withdrawal') {
-      // For withdrawal requests, create a transfer recipient and initiate transfer
       // First create a transfer recipient
       const recipientResponse = await fetch('https://api.paystack.co/transferrecipient', {
         method: 'POST',
@@ -44,7 +43,7 @@ serve(async (req) => {
         throw new Error(recipientData.message || 'Failed to create transfer recipient')
       }
       
-      // Now initiate the transfer with the recipient code
+      // Now initiate the transfer
       const transferResponse = await fetch('https://api.paystack.co/transfer', {
         method: 'POST',
         headers: {
