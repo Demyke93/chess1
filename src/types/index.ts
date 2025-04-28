@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   username: string;
@@ -21,6 +22,7 @@ export interface Match {
   createdAt: string;
   updatedAt: string;
   fee_accepted?: boolean;
+  fee_amount?: number; // Added fee_amount to Match interface
 }
 
 export interface StakeSettings {
@@ -50,3 +52,31 @@ export interface LichessUserProfile {
 }
 
 export type GameResult = 'win' | 'loss' | 'draw' | 'ongoing';
+
+export interface Wallet {
+  id: string;
+  user_id: string;
+  balance: number;
+  created_at: string;
+  updated_at: string;
+  is_demo?: boolean;
+}
+
+export interface DatabaseMatch {
+  id: string;
+  white_player_id: string;
+  black_player_id: string;
+  white_username: string | null;
+  black_username: string | null;
+  stake_amount: number;
+  status: 'pending' | 'active' | 'completed' | 'cancelled'; // Ensured this is properly typed
+  time_control: number;
+  game_mode: string;
+  pgn: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  winner_id: string | null;
+  fee_accepted: boolean;
+  fee_amount?: number; // Added fee_amount to DatabaseMatch
+}

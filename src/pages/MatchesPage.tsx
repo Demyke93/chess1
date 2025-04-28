@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { userService } from "@/services/userService";
@@ -12,6 +11,8 @@ import { Match } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Search } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 const MatchesPage = () => {
   const { user } = useAuth();
@@ -20,6 +21,7 @@ const MatchesPage = () => {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: matches = [], isLoading } = useQuery({
     queryKey: ["matches"],
@@ -34,12 +36,14 @@ const MatchesPage = () => {
 
   const filterMatches = (matchList: Match[]) => {
     return matchList.filter((match) => {
-      // Status filter
+      if (match.status === 'cancelled') {
+        return false;
+      }
+
       if (statusFilter !== "all" && match.status !== statusFilter) {
         return false;
       }
 
-      // Search query filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         return (
@@ -60,13 +64,30 @@ const MatchesPage = () => {
   };
 
   const handleJoinMatch = (match: Match) => {
-    // In a real app, this would integrate with the Lichess API
-    // For now, we'll simulate joining a match
     navigate(`/match/${match.id}`);
   };
 
   const handleCreateMatch = () => {
     navigate("/create-match");
+  };
+
+  const handleCancelMatch = async (match: Match) => {
+    try {
+      await userService.cancelMatch(match.id);
+      toast({
+        title: "Match Cancelled",
+        description: "Your match has been cancelled successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["userMatches"] });
+    } catch (error) {
+      console.error("Failed to cancel match:", error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel match. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredAllMatches = filterMatches(matches);
@@ -81,7 +102,6 @@ const MatchesPage = () => {
         </Button>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
@@ -105,7 +125,6 @@ const MatchesPage = () => {
         </Select>
       </div>
 
-      {/* Tabs for All Matches vs My Matches */}
       <Tabs defaultValue="all" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="all">All Matches</TabsTrigger>
@@ -131,6 +150,7 @@ const MatchesPage = () => {
                   match={match}
                   onViewDetails={handleViewDetails}
                   onJoinMatch={handleJoinMatch}
+                  onCancelMatch={handleCancelMatch}
                 />
               ))}
             </div>
@@ -154,6 +174,7 @@ const MatchesPage = () => {
                   match={match}
                   onViewDetails={handleViewDetails}
                   onJoinMatch={handleJoinMatch}
+                  onCancelMatch={handleCancelMatch}
                 />
               ))}
             </div>
@@ -161,7 +182,6 @@ const MatchesPage = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Match Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="bg-chess-dark border-chess-brown text-white max-w-lg">
           <DialogHeader>

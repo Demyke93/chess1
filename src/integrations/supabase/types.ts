@@ -9,238 +9,105 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      business_data: {
-        Row: {
-          content: Json
-          created_at: string | null
-          data_type: string
-          id: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          content?: Json
-          created_at?: string | null
-          data_type: string
-          id?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          content?: Json
-          created_at?: string | null
-          data_type?: string
-          id?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "business_data_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      chat_logs: {
-        Row: {
-          ai_response: string | null
-          created_at: string | null
-          customer_number: string
-          id: string
-          message: string
-          user_id: string | null
-        }
-        Insert: {
-          ai_response?: string | null
-          created_at?: string | null
-          customer_number: string
-          id?: string
-          message: string
-          user_id?: string | null
-        }
-        Update: {
-          ai_response?: string | null
-          created_at?: string | null
-          customer_number?: string
-          id?: string
-          message?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chat_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      display_name: {
-        Row: {
-          created_at: string
-          id: number
-        }
-        Insert: {
-          created_at?: string
-          id: number
-        }
-        Update: {
-          created_at?: string
-          id?: number
-        }
-        Relationships: []
-      }
       matches: {
         Row: {
           black_player_id: string | null
+          black_username: string | null
           completed_at: string | null
           created_at: string | null
+          fee_accepted: boolean | null
+          fee_amount: number | null
+          game_mode: string
           id: string
           pgn: string | null
           stake_amount: number
           status: string
           time_control: number
           updated_at: string | null
-          white_player_id: string
+          white_player_id: string | null
+          white_username: string | null
           winner_id: string | null
         }
         Insert: {
           black_player_id?: string | null
+          black_username?: string | null
           completed_at?: string | null
           created_at?: string | null
-          id?: string
-          pgn?: string | null
-          stake_amount: number
-          status: string
-          time_control: number
-          updated_at?: string | null
-          white_player_id: string
-          winner_id?: string | null
-        }
-        Update: {
-          black_player_id?: string | null
-          completed_at?: string | null
-          created_at?: string | null
+          fee_accepted?: boolean | null
+          fee_amount?: number | null
+          game_mode?: string
           id?: string
           pgn?: string | null
           stake_amount?: number
           status?: string
           time_control?: number
           updated_at?: string | null
-          white_player_id?: string
+          white_player_id?: string | null
+          white_username?: string | null
           winner_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "matches_black_player_id_fkey"
-            columns: ["black_player_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "matches_white_player_id_fkey"
-            columns: ["white_player_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "matches_winner_id_fkey"
-            columns: ["winner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Update: {
+          black_player_id?: string | null
+          black_username?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          fee_accepted?: boolean | null
+          fee_amount?: number | null
+          game_mode?: string
+          id?: string
+          pgn?: string | null
+          stake_amount?: number
+          status?: string
+          time_control?: number
+          updated_at?: string | null
+          white_player_id?: string | null
+          white_username?: string | null
+          winner_id?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string | null
-          display_name: string | null
-          gaming_preferences: Json | null
           id: string
           is_demo: boolean | null
-          rating: number | null
           updated_at: string | null
           username: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
-          display_name?: string | null
-          gaming_preferences?: Json | null
-          id?: string
+          id: string
           is_demo?: boolean | null
-          rating?: number | null
           updated_at?: string | null
           username?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
-          display_name?: string | null
-          gaming_preferences?: Json | null
           id?: string
           is_demo?: boolean | null
-          rating?: number | null
           updated_at?: string | null
           username?: string | null
         }
         Relationships: []
       }
-      settings: {
-        Row: {
-          auto_reply_enabled: boolean | null
-          id: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          auto_reply_enabled?: boolean | null
-          id?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          auto_reply_enabled?: boolean | null
-          id?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "settings_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       system_settings: {
         Row: {
           created_at: string | null
-          id: string
           key: string
           updated_at: string | null
           value: Json
         }
         Insert: {
           created_at?: string | null
-          id?: string
           key: string
           updated_at?: string | null
           value: Json
         }
         Update: {
           created_at?: string | null
-          id?: string
           key?: string
           updated_at?: string | null
           value?: Json
@@ -251,35 +118,38 @@ export type Database = {
         Row: {
           amount: number
           created_at: string | null
+          fee_amount: number | null
           id: string
           payout_details: Json | null
           reference: string | null
           status: string
           type: string
+          updated_at: string | null
           wallet_id: string
-          withdrawal_status: string | null
         }
         Insert: {
           amount: number
           created_at?: string | null
+          fee_amount?: number | null
           id?: string
           payout_details?: Json | null
           reference?: string | null
           status: string
           type: string
+          updated_at?: string | null
           wallet_id: string
-          withdrawal_status?: string | null
         }
         Update: {
           amount?: number
           created_at?: string | null
+          fee_amount?: number | null
           id?: string
           payout_details?: Json | null
           reference?: string | null
           status?: string
           type?: string
+          updated_at?: string | null
           wallet_id?: string
-          withdrawal_status?: string | null
         }
         Relationships: [
           {
@@ -291,85 +161,23 @@ export type Database = {
           },
         ]
       }
-      user_settings: {
-        Row: {
-          created_at: string | null
-          display_preferences: Json | null
-          id: string
-          language: string | null
-          notification_preferences: Json | null
-          privacy_settings: Json | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          display_preferences?: Json | null
-          id: string
-          language?: string | null
-          notification_preferences?: Json | null
-          privacy_settings?: Json | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          display_preferences?: Json | null
-          id?: string
-          language?: string | null
-          notification_preferences?: Json | null
-          privacy_settings?: Json | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_settings_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      users: {
-        Row: {
-          business_name: string
-          created_at: string | null
-          id: string
-          last_active: string | null
-          whatsapp_number: string
-        }
-        Insert: {
-          business_name: string
-          created_at?: string | null
-          id?: string
-          last_active?: string | null
-          whatsapp_number: string
-        }
-        Update: {
-          business_name?: string
-          created_at?: string | null
-          id?: string
-          last_active?: string | null
-          whatsapp_number?: string
-        }
-        Relationships: []
-      }
       wallets: {
         Row: {
-          balance: number | null
+          balance: number
           created_at: string | null
           id: string
           updated_at: string | null
           user_id: string
         }
         Insert: {
-          balance?: number | null
+          balance?: number
           created_at?: string | null
           id?: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
-          balance?: number | null
+          balance?: number
           created_at?: string | null
           id?: string
           updated_at?: string | null
@@ -385,91 +193,13 @@ export type Database = {
           },
         ]
       }
-      whatsapp_config: {
-        Row: {
-          access_token: string
-          created_at: string | null
-          id: string
-          phone_number_id: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          access_token: string
-          created_at?: string | null
-          id?: string
-          phone_number_id: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          access_token?: string
-          created_at?: string | null
-          id?: string
-          phone_number_id?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_config_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      create_or_join_match: {
-        Args: {
-          p_user_id: string
-          p_time_control: number
-          p_stake_amount: number
-        }
-        Returns: {
-          black_player_id: string | null
-          completed_at: string | null
-          created_at: string | null
-          id: string
-          pgn: string | null
-          stake_amount: number
-          status: string
-          time_control: number
-          updated_at: string | null
-          white_player_id: string
-          winner_id: string | null
-        }
-      }
-      create_transaction: {
-        Args: {
-          p_wallet_id: string
-          p_amount: number
-          p_type: string
-          p_reference: string
-        }
-        Returns: {
-          amount: number
-          created_at: string | null
-          id: string
-          payout_details: Json | null
-          reference: string | null
-          status: string
-          type: string
-          wallet_id: string
-          withdrawal_status: string | null
-        }
-      }
-      update_transaction_status: {
-        Args: { p_reference: string; p_status: string }
-        Returns: undefined
-      }
-      update_wallet_balance: {
-        Args: { p_wallet_id: string; p_amount: number }
+      create_wallet: {
+        Args: { p_user_id: string }
         Returns: undefined
       }
     }

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -14,8 +14,29 @@ export const RegisterPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Check if username already exists
+  const checkUsernameExists = async (username: string) => {
+    try {
+      setIsCheckingUsername(true);
+      // Check if username exists in profiles table
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', username)
+        .single();
+        
+      return data !== null;
+    } catch (error) {
+      console.error("Error checking username:", error);
+      return false;
+    } finally {
+      setIsCheckingUsername(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,9 +50,31 @@ export const RegisterPage = () => {
       return;
     }
     
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
+      // Check if username already exists
+      const usernameExists = await checkUsernameExists(username);
+      
+      if (usernameExists) {
+        toast({
+          title: "Username already taken",
+          description: "Please choose a different username",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
       // Register with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -52,7 +95,7 @@ export const RegisterPage = () => {
         description: "Your account has been created",
       });
       navigate("/login");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration failed:", error);
       toast({
         title: "Registration failed",
@@ -114,7 +157,7 @@ export const RegisterPage = () => {
               <Button 
                 type="submit" 
                 className="w-full bg-chess-accent hover:bg-chess-accent/80 text-black"
-                disabled={isLoading}
+                disabled={isLoading || isCheckingUsername}
               >
                 {isLoading ? "Creating account..." : "Create Account"}
               </Button>

@@ -1,18 +1,45 @@
-
 import { User, Match } from '@/types';
 import { supabase } from "@/integrations/supabase/client";
 
 // Current user session
 let currentUser: User | null = null;
 
+// In-memory storage for demo matches
+let demoMatches: Match[] = [];
+
+// Function with fixed mapping between database fields and our Match type
+const mapDatabaseMatchToMatch = (match: any): Match => {
+  return {
+    id: match.id,
+    whitePlayerId: match.white_player_id,
+    blackPlayerId: match.black_player_id,
+    whiteUsername: match.white_username || 'Unknown',
+    blackUsername: match.black_username || 'Unknown',
+    stake: match.stake_amount,
+    status: match.status as 'pending' | 'active' | 'completed' | 'cancelled',
+    winner: match.winner_id,
+    timeControl: match.time_control?.toString() || '10',
+    gameMode: match.game_mode || (parseInt(match.time_control?.toString() || '10') <= 5 ? 'blitz' : 'rapid'),
+    lichessGameId: match.lichess_game_id || match.pgn,
+    createdAt: match.created_at,
+    updatedAt: match.updated_at || match.created_at,
+    fee_accepted: match.fee_accepted || false
+  };
+};
+
 export const userService = {
   // Login user
-  login: async (username: string, password: string): Promise<User> => {
+  login: async (emailOrUsername: string, password: string): Promise<User> => {
     try {
+      // Only allow login if password is provided
+      if (!password) {
+        throw new Error("Password is required");
+      }
+      
       // Try to authenticate with Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: `${username}@example.com`, // Using username as email for simplicity
-        password: password || 'demo123' // Default password for demo
+        email: emailOrUsername, // Use the email directly
+        password: password
       });
 
       if (authError) throw authError;
@@ -34,7 +61,7 @@ export const userService = {
           
         const user: User = {
           id: authData.user.id,
-          username: profileData?.username || username,
+          username: profileData?.username || emailOrUsername,
           balance: walletData?.balance || 0,
           avatar: profileData?.avatar_url || '♟',
           email: authData.user.email
@@ -47,18 +74,7 @@ export const userService = {
       throw new Error("Authentication failed");
     } catch (error) {
       console.error("Login error:", error);
-      
-      // For demo purposes, create a demo account if auth fails
-      const newUser: User = {
-        id: `demo_${Math.random().toString(36).substr(2, 9)}`,
-        username,
-        balance: 1000, // Demo accounts start with 1000 coins
-        avatar: '♟', // Default avatar
-        email: `${username}@example.com`
-      };
-      
-      currentUser = newUser;
-      return newUser;
+      throw error;
     }
   },
 
@@ -112,6 +128,7 @@ export const userService = {
     try {
       await supabase.auth.signOut();
       currentUser = null;
+      demoMatches = []; // Clear demo matches on logout
       return Promise.resolve();
     } catch (error) {
       console.error("Logout error:", error);
@@ -235,202 +252,182 @@ export const userService = {
     }
   },
 
-  // Create a match
-  createMatch: async (match: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>): Promise<Match> => {
+  // Match related functions
+  createMatch: async (matchData: Partial<Match>): Promise<Match> => {
     try {
-      // Check if this involves demo users
-      if (match.whitePlayerId.startsWith('demo_') || match.blackPlayerId.startsWith('demo_')) {
-        const now = new Date().toISOString();
-        const newMatch: Match = {
-          id: `demo_match_${Math.random().toString(36).substr(2, 9)}`,
-          ...match,
-          createdAt: now,
-          updatedAt: now
-        };
-        return newMatch;
-      }
-      
-      // Create match in Supabase
       const { data, error } = await supabase
         .from('matches')
         .insert({
-          white_player_id: match.whitePlayerId,
-          black_player_id: match.blackPlayerId,
-          stake_amount: match.stake,
-          status: match.status,
-          time_control: parseInt(match.timeControl),
-          created_at: new Date().toISOString()
+          white_player_id: matchData.whitePlayerId,
+          black_player_id: matchData.blackPlayerId || null,
+          white_username: matchData.whiteUsername,
+          black_username: matchData.blackUsername || null,
+          stake_amount: matchData.stake || 0,
+          status: matchData.status || 'pending',
+          time_control: parseInt(matchData.timeControl || '5'),
+          game_mode: matchData.gameMode || 'standard'
         })
-        .select()
+        .select('*')
         .single();
-        
+
       if (error) throw error;
       
-      return {
-        id: data.id,
-        whitePlayerId: data.white_player_id,
-        blackPlayerId: data.black_player_id,
-        whiteUsername: match.whiteUsername,
-        blackUsername: match.blackUsername,
-        stake: data.stake_amount,
-        status: data.status,
-        timeControl: match.timeControl,
-        gameMode: match.gameMode,
-        lichessGameId: match.lichessGameId,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at || data.created_at
-      };
+      return mapDatabaseMatchToMatch(data);
     } catch (error) {
       console.error("Create match error:", error);
       throw error;
     }
   },
 
-  // Get all matches for a user
-  getUserMatches: async (userId: string): Promise<Match[]> => {
+  getAllMatches: async (): Promise<Match[]> => {
     try {
-      // Check if this is a demo ID
-      if (userId.startsWith('demo_')) {
-        return [];
-      }
-      
-      // Get matches from Supabase
       const { data, error } = await supabase
         .from('matches')
-        .select(`
-          *,
-          white_player:white_player_id(username),
-          black_player:black_player_id(username)
-        `)
-        .or(`white_player_id.eq.${userId},black_player_id.eq.${userId}`)
+        .select('*')
         .order('created_at', { ascending: false });
-          
+
       if (error) throw error;
       
-      return data.map(match => ({
-        id: match.id,
-        whitePlayerId: match.white_player_id,
-        blackPlayerId: match.black_player_id,
-        whiteUsername: match.white_player?.username || 'Unknown',
-        blackUsername: match.black_player?.username || 'Unknown',
-        stake: match.stake_amount,
-        status: match.status,
-        winner: match.winner_id,
-        timeControl: match.time_control.toString(),
-        gameMode: match.time_control <= 5 ? 'blitz' : 'rapid',
-        lichessGameId: match.pgn,
-        createdAt: match.created_at,
-        updatedAt: match.updated_at || match.created_at
-      }));
+      return (data || []).map(mapDatabaseMatchToMatch);
+    } catch (error) {
+      console.error("Get all matches error:", error);
+      return [];
+    }
+  },
+
+  getUserMatches: async (userId: string): Promise<Match[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('matches')
+        .select('*')
+        .or(`white_player_id.eq.${userId},black_player_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      return (data || []).map(mapDatabaseMatchToMatch);
     } catch (error) {
       console.error("Get user matches error:", error);
       return [];
     }
   },
 
-  // Complete a match and handle stake transfers
-  completeMatch: async (matchId: string, winnerId: string | null): Promise<Match> => {
+  cancelMatch: async (matchId: string): Promise<void> => {
     try {
-      // Check if this is a demo match
-      if (matchId.startsWith('demo_match_')) {
-        throw new Error('Demo matches cannot be completed');
-      }
-      
-      // Get match from Supabase
-      const { data: matchData, error: matchError } = await supabase
+      const { error } = await supabase
         .from('matches')
-        .select(`
-          *,
-          white_player:white_player_id(username),
-          black_player:black_player_id(username)
-        `)
+        .update({ status: 'cancelled' })
         .eq('id', matchId)
-        .single();
+        .eq('status', 'pending'); // Only cancel if it's still pending
         
-      if (matchError) throw matchError;
-      
-      if (matchData.status === 'completed') {
-        throw new Error('Match already completed');
-      }
-      
-      // Update match status
-      const { error: updateError } = await supabase
-        .from('matches')
-        .update({
-          status: 'completed',
-          winner_id: winnerId,
-          updated_at: new Date().toISOString(),
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', matchId);
-        
-      if (updateError) throw updateError;
-      
-      // Handle stake transfers if there's a winner
-      if (winnerId) {
-        const loserId = winnerId === matchData.white_player_id ? matchData.black_player_id : matchData.white_player_id;
-        
-        // Credit winner
-        await userService.updateBalance(winnerId, matchData.stake_amount);
-        
-        // Debit loser
-        await userService.updateBalance(loserId, -matchData.stake_amount);
-      }
-      
-      return {
-        id: matchData.id,
-        whitePlayerId: matchData.white_player_id,
-        blackPlayerId: matchData.black_player_id,
-        whiteUsername: matchData.white_player?.username || 'Unknown',
-        blackUsername: matchData.black_player?.username || 'Unknown',
-        stake: matchData.stake_amount,
-        status: 'completed',
-        winner: winnerId,
-        timeControl: matchData.time_control.toString(),
-        gameMode: matchData.time_control <= 5 ? 'blitz' : 'rapid',
-        lichessGameId: matchData.pgn,
-        createdAt: matchData.created_at,
-        updatedAt: new Date().toISOString()
-      };
+      if (error) throw error;
     } catch (error) {
-      console.error("Complete match error:", error);
+      console.error("Cancel match error:", error);
       throw error;
     }
   },
 
-  // Get all matches
-  getAllMatches: async (): Promise<Match[]> => {
+  getMatchById: async (id: string): Promise<Match | null> => {
     try {
       const { data, error } = await supabase
         .from('matches')
-        .select(`
-          *,
-          white_player:white_player_id(username),
-          black_player:black_player_id(username)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(50);
-          
+        .select('*')
+        .eq('id', id)
+        .single();
+        
       if (error) throw error;
       
-      return data.map(match => ({
-        id: match.id,
-        whitePlayerId: match.white_player_id,
-        blackPlayerId: match.black_player_id,
-        whiteUsername: match.white_player?.username || 'Unknown',
-        blackUsername: match.black_player?.username || 'Unknown',
-        stake: match.stake_amount,
-        status: match.status,
-        winner: match.winner_id,
-        timeControl: match.time_control.toString(),
-        gameMode: match.time_control <= 5 ? 'blitz' : 'rapid',
-        lichessGameId: match.pgn,
-        createdAt: match.created_at,
-        updatedAt: match.updated_at || match.created_at
-      }));
+      return mapDatabaseMatchToMatch(data);
     } catch (error) {
-      console.error("Get all matches error:", error);
-      return [];
+      console.error("Get match by ID error:", error);
+      return null;
+    }
+  },
+
+  updateMatch: async (id: string, matchData: Partial<Match>): Promise<Match> => {
+    try {
+      // Convert from our Match type to database fields
+      const dbData: any = {};
+      
+      if (matchData.blackPlayerId !== undefined) dbData.black_player_id = matchData.blackPlayerId;
+      if (matchData.blackUsername !== undefined) dbData.black_username = matchData.blackUsername;
+      if (matchData.status !== undefined) dbData.status = matchData.status;
+      if (matchData.winner !== undefined) dbData.winner_id = matchData.winner;
+      if (matchData.lichessGameId !== undefined) dbData.lichess_game_id = matchData.lichessGameId;
+      
+      const { data, error } = await supabase
+        .from('matches')
+        .update(dbData)
+        .eq('id', id)
+        .select('*')
+        .single();
+        
+      if (error) throw error;
+      
+      return mapDatabaseMatchToMatch(data);
+    } catch (error) {
+      console.error("Update match error:", error);
+      throw error;
+    }
+  },
+
+  deleteMatch: async (id: string): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('matches')
+        .delete()
+        .eq('id', id);
+        
+      if (error) throw error;
+    } catch (error) {
+      console.error("Delete match error:", error);
+      throw error;
+    }
+  },
+
+  joinMatch: async (matchId: string, userId: string): Promise<Match> => {
+    try {
+      // First get user details
+      const user = await userService.getUserById(userId);
+      if (!user) throw new Error("User not found");
+      
+      // Get the match
+      const match = await userService.getMatchById(matchId);
+      if (!match) throw new Error("Match not found");
+      
+      if (match.status !== 'pending') {
+        throw new Error("Cannot join match that is not pending");
+      }
+      
+      if (match.whitePlayerId === userId) {
+        throw new Error("Cannot join your own match");
+      }
+      
+      // Update the match with black player info and set to active
+      const updatedMatch = await userService.updateMatch(matchId, {
+        blackPlayerId: userId,
+        blackUsername: user.username,
+        status: 'active'
+      });
+      
+      return updatedMatch;
+    } catch (error) {
+      console.error("Join match error:", error);
+      throw error;
+    }
+  },
+
+  completeMatch: async (matchId: string, winnerId: string | null): Promise<Match> => {
+    try {
+      const updatedMatch = await userService.updateMatch(matchId, {
+        status: 'completed',
+        winner: winnerId
+      });
+      
+      return updatedMatch;
+    } catch (error) {
+      console.error("Complete match error:", error);
+      throw error;
     }
   }
 };

@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { userService } from "@/services/userService";
 import { useAuth } from "@/context/AuthContext";
@@ -10,6 +9,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
+import { Match } from "@/types";
+import { matchService } from '@/services/matchService';
+import { UpdateUsername } from "@/components/profile/UpdateUsername";
 
 const ProfilePage = () => {
   const { user } = useAuth();
@@ -44,32 +46,21 @@ const ProfilePage = () => {
     checkDemoStatus();
   }, [user]);
 
-  const { data: matches = [] } = useQuery({
+  const { data: fetchedMatches = [] } = useQuery({
     queryKey: ["userMatches", user.id, isDemo],
     queryFn: async () => {
       if (isDemo === true) {
-        // Use mock data for demo accounts
-        return userService.getUserMatches(user.id);
+        return matchService.getUserMatches(user.id);
       } else if (isDemo === false) {
-        // For real accounts, get matches from the database
-        const { data, error } = await supabase
-          .from('matches')
-          .select('*')
-          .or(`white_player_id.eq.${user.id},black_player_id.eq.${user.id}`)
-          .order('created_at', { ascending: false });
-          
-        if (error) {
-          console.error("Error fetching matches:", error);
-          return [];
-        }
-        
-        return data || [];
+        return matchService.getUserMatches(user.id);
       }
-      
       return [];
     },
     enabled: !!user && isDemo !== null
   });
+
+  // Ensure matches is of type Match[]
+  const matches: Match[] = fetchedMatches as Match[];
 
   // Calculate stats
   const completedMatches = matches.filter(match => match.status === 'completed');
@@ -85,7 +76,7 @@ const ProfilePage = () => {
   const pendingMatches = matches.filter(match => match.status === 'pending');
   const matchHistory = matches.filter(match => match.status === 'completed');
 
-  const handleViewDetails = (match: any) => {
+  const handleViewDetails = (match: Match) => {
     navigate(`/match/${match.id}`);
   };
 
@@ -153,6 +144,11 @@ const ProfilePage = () => {
                 </div>
               </div>
               
+              <div className="bg-chess-dark/50 p-4 rounded-md">
+                <h3 className="text-sm font-medium text-gray-400 mb-2">Update Username</h3>
+                <UpdateUsername />
+              </div>
+
               {isDemo && (
                 <div className="bg-amber-500/20 p-3 rounded-md border border-amber-500/30">
                   <p className="text-amber-300 text-sm">This is a demo account. Some features may be limited.</p>

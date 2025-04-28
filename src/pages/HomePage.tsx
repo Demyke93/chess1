@@ -1,24 +1,20 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "react-router-dom";
-import { userService } from "@/services/userService";
 import { useQuery } from "@tanstack/react-query";
 import { MatchCard } from "@/components/MatchCard";
 import { ChessBoard } from "@/components/ChessBoard";
 import { supabase } from "@/integrations/supabase/client";
+import { matchService } from '@/services/matchService';
 
 export const HomePage = () => {
   const { user } = useAuth();
   
-  // Query for getting real matches from database for authenticated users
   const { data: recentMatches } = useQuery({
     queryKey: ["recentMatches", user?.id],
     queryFn: async () => {
-      // For authenticated users, fetch matches from database
       if (user) {
-        // Check if user is a demo account
         const { data: profileData } = await supabase
           .from('profiles')
           .select('is_demo')
@@ -27,24 +23,10 @@ export const HomePage = () => {
           
         const isDemo = profileData?.is_demo;
         
-        // Use mock data for demo accounts, real data for real accounts
         if (isDemo) {
-          return userService.getAllMatches();
+          return matchService.getAllMatches();
         } else {
-          // For real accounts, get matches from the database
-          const { data: matches, error } = await supabase
-            .from('matches')
-            .select('*')
-            .or(`white_player_id.eq.${user.id},black_player_id.eq.${user.id}`)
-            .order('created_at', { ascending: false })
-            .limit(3);
-            
-          if (error) {
-            console.error("Error fetching matches:", error);
-            return [];
-          }
-          
-          return matches || [];
+          return matchService.getUserMatches(user.id);
         }
       }
       return [];

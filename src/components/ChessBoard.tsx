@@ -18,7 +18,7 @@ export const ChessBoard = ({ simplified = false }: ChessBoardProps) => {
               key={index} 
               className={`${isLight ? 'bg-chess-light' : 'bg-chess-brown'} flex items-center justify-center`}
             >
-              {getPiece(row, col)}
+              {getChessPiece(row, col)}
             </div>
           );
         })}
@@ -26,8 +26,7 @@ export const ChessBoard = ({ simplified = false }: ChessBoardProps) => {
     );
   }
   
-  // For a full board, we would implement the actual game logic
-  // This would be connected to the Lichess API in the real implementation
+  // For a full board implementation
   return (
     <div className="w-full aspect-square grid grid-cols-8 grid-rows-8 border border-chess-brown">
       {[...Array(64)].map((_, index) => {
@@ -40,7 +39,7 @@ export const ChessBoard = ({ simplified = false }: ChessBoardProps) => {
             key={index} 
             className={`${isLight ? 'bg-chess-light' : 'bg-chess-brown'} flex items-center justify-center relative`}
           >
-            {getPiece(row, col)}
+            {getChessPiece(row, col)}
             {/* Column labels (a-h) at bottom row */}
             {row === 7 && (
               <div className="absolute bottom-0 right-0 text-xs p-0.5 opacity-70">
@@ -61,7 +60,7 @@ export const ChessBoard = ({ simplified = false }: ChessBoardProps) => {
 };
 
 // Function to determine what piece should be displayed at a given position
-function getPiece(row: number, col: number): JSX.Element | null {
+function getChessPiece(row: number, col: number): JSX.Element | null {
   // Initial chess setup
   const pieces = [
     ['♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖'], // White back row

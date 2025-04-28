@@ -8,17 +8,28 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
+import { lichessApi } from "@/services/lichessApi";
+import { calculateFee, calculateTotalWithFee } from "@/utils/feeCalculations";
 
 interface MatchCardProps {
   match: Match;
   onViewDetails?: (match: Match) => void;
   onJoinMatch?: (match: Match) => void;
+  onCancelMatch?: (match: Match) => void;
 }
 
-export const MatchCard = ({ match, onViewDetails, onJoinMatch }: MatchCardProps) => {
+export const MatchCard = ({ match, onViewDetails, onJoinMatch, onCancelMatch }: MatchCardProps) => {
+  if (match.status === 'cancelled') {
+    return null;
+  }
+
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [showFeeWarning, setShowFeeWarning] = useState(false);
+  const [showLichessDialog, setShowLichessDialog] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   
   const isUserInMatch = user && (match.whitePlayerId === user.id || match.blackPlayerId === user.id);
   const userIsWinner = user && match.winner === user.id;
@@ -35,18 +46,73 @@ export const MatchCard = ({ match, onViewDetails, onJoinMatch }: MatchCardProps)
   };
 
   const handleJoinWithFee = async () => {
-    if (!match.fee_accepted) {
-      setShowFeeWarning(true);
+    const totalCost = calculateTotalWithFee(match.stake);
+    
+    if (!user?.balance || totalCost > user.balance) {
+      toast({
+        title: "Insufficient Balance",
+        description: `You need ${totalCost} coins (${match.stake} stake + ${calculateFee(match.stake)} fee) to join this match`,
+        variant: "destructive"
+      });
       return;
     }
     
-    if (onJoinMatch) {
-      onJoinMatch(match);
+    setIsJoining(true);
+    try {
+      if (onJoinMatch) {
+        onJoinMatch(match);
+      } else {
+        navigate(`/match/${match.id}`);
+      }
+      toast({
+        title: "Joining Match",
+        description: "You're being connected to the match...",
+      });
+    } catch (error) {
+      console.error("Error joining match:", error);
+      toast({
+        title: "Error",
+        description: "Failed to join match. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsJoining(false);
     }
   };
 
-  const calculateFee = (stake: number) => {
-    return Math.ceil(stake * 0.01); // 1% fee
+  const handlePlayNow = () => {
+    if (!lichessApi.isAuthenticated()) {
+      setShowLichessDialog(true);
+      return;
+    }
+    
+    toast({
+      title: "Opening Match",
+      description: "Connecting to your game...",
+    });
+    navigate(`/match/${match.id}`);
+  };
+
+  const handleLichessConnect = async () => {
+    try {
+      if (user) {
+        await lichessApi.mockAuthenticate(user.username);
+        setShowLichessDialog(false);
+        toast({
+          title: "Connected to Lichess",
+          description: "You've been connected to Lichess successfully",
+        });
+        
+        navigate(`/match/${match.id}`);
+      }
+    } catch (error) {
+      console.error('Error connecting to Lichess:', error);
+      toast({
+        title: "Connection Failed",
+        description: "Could not connect to Lichess. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -62,7 +128,7 @@ export const MatchCard = ({ match, onViewDetails, onJoinMatch }: MatchCardProps)
             </div>
           </div>
           <CardTitle className="text-lg mt-2">
-            {match.whiteUsername} vs {match.blackUsername}
+            {match.whiteUsername} vs {match.blackUsername || 'Waiting for opponent'}
           </CardTitle>
           <CardDescription>
             {match.timeControl} • {match.gameMode} • 
@@ -86,10 +152,24 @@ export const MatchCard = ({ match, onViewDetails, onJoinMatch }: MatchCardProps)
         </CardContent>
         
         <CardFooter className="flex justify-between">
-          {match.status === 'pending' && !isUserInMatch && onJoinMatch && (
+          {match.status === 'pending' && !isUserInMatch && (
             <>
-              <Button onClick={handleJoinWithFee} className="w-full">
-                Join Match ({match.stake} coins + {calculateFee(match.stake)} fee)
+              <Button 
+                onClick={handleJoinWithFee} 
+                className="w-full"
+                disabled={isJoining}
+              >
+                {isJoining ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Joining...
+                  </span>
+                ) : (
+                  `Join Match (${match.stake} coins + ${calculateFee(match.stake)} fee)`
+                )}
               </Button>
               
               <Dialog open={showFeeWarning} onOpenChange={setShowFeeWarning}>
@@ -107,10 +187,8 @@ export const MatchCard = ({ match, onViewDetails, onJoinMatch }: MatchCardProps)
                     </Button>
                     <Button onClick={() => {
                       setShowFeeWarning(false);
-                      if (onJoinMatch) {
-                        match.fee_accepted = true;
-                        onJoinMatch(match);
-                      }
+                      match.fee_accepted = true;
+                      handleJoinWithFee();
                     }}>
                       Accept & Join
                     </Button>
@@ -121,13 +199,24 @@ export const MatchCard = ({ match, onViewDetails, onJoinMatch }: MatchCardProps)
           )}
           
           {match.status === 'pending' && isUserInMatch && (
-            <Button disabled variant="outline" className="w-full">
-              Waiting for opponent
-            </Button>
+            <div className="space-y-2 w-full">
+              <Button disabled variant="outline" className="w-full">
+                <span className="flex items-center">
+                  <svg className="animate-pulse -ml-1 mr-2 h-4 w-4 text-amber-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  Waiting for opponent
+                </span>
+              </Button>
+            </div>
           )}
           
           {match.status === 'active' && isUserInMatch && (
-            <Button className="w-full bg-chess-accent hover:bg-chess-accent/80 text-black">
+            <Button 
+              className="w-full bg-chess-accent hover:bg-chess-accent/80 text-black"
+              onClick={handlePlayNow}
+            >
               Play Now
             </Button>
           )}
@@ -135,6 +224,16 @@ export const MatchCard = ({ match, onViewDetails, onJoinMatch }: MatchCardProps)
           {match.status !== 'pending' && onViewDetails && (
             <Button variant="outline" onClick={() => onViewDetails(match)} className="w-full">
               View Details
+            </Button>
+          )}
+          
+          {match.status !== 'pending' && !onViewDetails && (
+            <Button 
+              variant="outline" 
+              onClick={() => navigate(`/match/${match.id}`)} 
+              className="w-full"
+            >
+              View Match
             </Button>
           )}
           
@@ -149,8 +248,44 @@ export const MatchCard = ({ match, onViewDetails, onJoinMatch }: MatchCardProps)
               -{match.stake} coins
             </div>
           )}
+          
+          {match.status === 'pending' && isUserInMatch && onCancelMatch && (
+            <Button 
+              variant="destructive" 
+              onClick={() => onCancelMatch(match)} 
+              className="w-full"
+            >
+              Cancel Match
+            </Button>
+          )}
         </CardFooter>
       </div>
+
+      <Dialog open={showLichessDialog} onOpenChange={setShowLichessDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect to Lichess</DialogTitle>
+            <DialogDescription>
+              To play this match, you need to connect to your Lichess account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col space-y-4">
+            <Button onClick={handleLichessConnect}>
+              Connect to Lichess
+            </Button>
+            <a 
+              href="https://lichess.org/signup" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="w-full"
+            >
+              <Button variant="outline" className="w-full">
+                Create a Lichess Account
+              </Button>
+            </a>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

@@ -1,8 +1,10 @@
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/context/AuthContext';
 import { Menu, X } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export const Navbar = () => {
   const { user, logout } = useAuth();
@@ -10,6 +12,11 @@ export const Navbar = () => {
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  // Get first letter of username for avatar fallback
+  const getInitials = (username: string) => {
+    return username?.charAt(0).toUpperCase() || '♟';
   };
 
   return (
@@ -43,9 +50,15 @@ export const Navbar = () => {
           {user ? (
             <div className="flex items-center space-x-4">
               <Link to="/profile" className="flex items-center">
-                <div className="bg-chess-brown rounded-full w-8 h-8 flex items-center justify-center mr-2">
-                  <span className="text-white">{user.avatar || '♟'}</span>
-                </div>
+                <Avatar className="w-8 h-8 mr-2 bg-chess-brown">
+                  {user.avatar && user.avatar.startsWith('http') ? (
+                    <AvatarImage src={user.avatar} alt={user.username} />
+                  ) : (
+                    <AvatarFallback className="bg-chess-brown text-white">
+                      {getInitials(user.username)}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
                 <div className="flex flex-col">
                   <span className="text-white">{user.username}</span>
                   <span className="text-chess-accent">{user.balance} coins</span>
@@ -81,9 +94,15 @@ export const Navbar = () => {
           {user ? (
             <div className="py-2">
               <Link to="/profile" className="flex items-center py-2" onClick={toggleMobileMenu}>
-                <div className="bg-chess-brown rounded-full w-8 h-8 flex items-center justify-center mr-2">
-                  <span className="text-white">{user.avatar || '♟'}</span>
-                </div>
+                <Avatar className="w-8 h-8 mr-2 bg-chess-brown">
+                  {user.avatar && user.avatar.startsWith('http') ? (
+                    <AvatarImage src={user.avatar} alt={user.username} />
+                  ) : (
+                    <AvatarFallback className="bg-chess-brown text-white">
+                      {getInitials(user.username)}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
                 <div>
                   <div className="text-white">{user.username}</div>
                   <div className="text-chess-accent">{user.balance} coins</div>
