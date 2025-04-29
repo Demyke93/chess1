@@ -1,40 +1,33 @@
 
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { GraduationCap } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
+import { Container } from "@/components/ui/Container";
 
 const NotFound = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-chess-dark">
-      <div className="text-center p-8 border border-chess-brown/30 rounded-lg bg-chess-dark/80 shadow-lg">
-        <div className="flex justify-center mb-4">
-          <GraduationCap className="h-16 w-16 text-chess-accent" />
-        </div>
-        <h1 className="text-6xl font-bold text-chess-accent mb-4">404</h1>
-        <p className="text-xl text-white mb-4">Oops! This move isn't in our playbook.</p>
-        <p className="text-gray-400 mb-8">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="flex gap-4 justify-center flex-wrap">
-          <Link to="/">
-            <Button className="bg-chess-accent hover:bg-chess-accent/80 text-black">
-              Return to Home
-            </Button>
-          </Link>
-          <Link to="/matches">
-            <Button variant="outline" className="border-chess-accent text-chess-accent hover:bg-chess-accent/10">
-              Browse Matches
-            </Button>
-          </Link>
-          <Link to="/register">
-            <Button variant="outline" className="border-chess-accent text-chess-accent hover:bg-chess-accent/10">
-              Sign Up
-            </Button>
-          </Link>
-        </div>
-      </div>
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <main className="flex-grow flex items-center justify-center py-16">
+        <Container>
+          <div className="text-center">
+            <h1 className="text-9xl font-bold text-primary">404</h1>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight">Page not found</h2>
+            <p className="mt-6 text-lg text-muted-foreground max-w-md mx-auto">
+              Sorry, we couldn't find the page you're looking for. It might have been moved or deleted.
+            </p>
+            <div className="mt-10">
+              <Button asChild size="lg">
+                <Link to="/">Back to home</Link>
+              </Button>
+            </div>
+          </div>
+        </Container>
+      </main>
+      <Footer />
     </div>
   );
-};
+}
 
 export default NotFound;
