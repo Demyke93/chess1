@@ -8,8 +8,6 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
-import { Info } from "lucide-react";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 
 export const LoginPage = () => {
@@ -113,17 +111,6 @@ export const LoginPage = () => {
               : "Enter your email and password to sign in to your account"
             }
           </CardDescription>
-          
-          {!isForgotPassword && (
-            <Alert className="mt-4 bg-chess-brown/20 border-chess-brown">
-              <Info className="h-4 w-4 text-chess-accent" />
-              <AlertTitle>Demo Integration</AlertTitle>
-              <AlertDescription>
-                This app uses mock Lichess authentication for demonstration purposes. 
-                In a production app, users would authenticate through Lichess OAuth 2.0.
-              </AlertDescription>
-            </Alert>
-          )}
         </CardHeader>
         <CardContent className="space-y-4">
           {isForgotPassword ? (

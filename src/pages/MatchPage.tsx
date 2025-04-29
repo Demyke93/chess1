@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,27 +7,27 @@ import { ChessBoard } from "@/components/ChessBoard";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { matchService } from "@/services/matchService";
+import { matchService, socketChessService } from "@/services/matchServiceImport";
 import { Match } from "@/types";
+import { SocketChessEmbed } from "@/components/chess/SocketChessEmbed";
+import { useSocketChess } from "@/hooks/useSocketChess";
 import { 
-  Loader2, ArrowLeft, ExternalLink, Flag, Share2, RefreshCw, Link2
+  Loader2, ArrowLeft, Flag, Share2, RefreshCw
 } from "lucide-react";
 
 const MatchPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isLichessAuthenticated, connectToLichess } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshingGame, setRefreshingGame] = useState(false);
   const [gameStatus, setGameStatus] = useState<'preparing' | 'playing' | 'completed'>('preparing');
-  const [lichessGameId, setLichessGameId] = useState<string | null>(null);
-  const [showLichessAuth, setShowLichessAuth] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
   const [creatingOpenChallenge, setCreatingOpenChallenge] = useState(false);
-  const [challengeUrl, setChallengeUrl] = useState<string | null>(null);
   const [joinedMatch, setJoinedMatch] = useState(false);
+  const { connected, connect, createMatch, joinMatch } = useSocketChess();
   
   const fetchMatch = useCallback(async () => {
     if (!id) return;
@@ -40,21 +41,12 @@ const MatchPage = () => {
         console.log(`Match data received:`, fetchedMatch);
         setMatch(fetchedMatch);
         
-        if (fetchedMatch.lichessGameId) {
-          console.log(`Match has Lichess game ID: ${fetchedMatch.lichessGameId}`);
-          if (fetchedMatch.lichessGameId.includes('http')) {
-            setChallengeUrl(fetchedMatch.lichessGameId);
-            const extractedId = lichessApi.extractGameId(fetchedMatch.lichessGameId);
-            if (extractedId) {
-              setLichessGameId(extractedId);
-            } else {
-              setLichessGameId(fetchedMatch.lichessGameId);
-            }
-          } else {
-            setLichessGameId(fetchedMatch.lichessGameId);
-          }
-          
-          setGameStatus(fetchedMatch.status === 'completed' ? 'completed' : 'playing');
+        if (fetchedMatch.status === 'active') {
+          setGameStatus('playing');
+        } else if (fetchedMatch.status === 'completed') {
+          setGameStatus('completed');
+        } else {
+          setGameStatus('preparing');
         }
         
         const bothPlayersPresent = fetchedMatch.whitePlayerId && fetchedMatch.blackPlayerId;
@@ -100,11 +92,20 @@ const MatchPage = () => {
           description: "You've successfully joined this match",
         });
         fetchMatch();
+        
+        // Also join the socket chess room
+        if (connected) {
+          try {
+            await joinMatch(id);
+          } catch (error) {
+            console.error("Error joining socket match:", error);
+          }
+        }
       }
     } catch (error) {
       console.error("Error joining match:", error);
     }
-  }, [id, user, match, joinedMatch, toast, fetchMatch]);
+  }, [id, user, match, joinedMatch, connected, toast, fetchMatch, joinMatch]);
   
   useEffect(() => {
     fetchMatch();
@@ -143,16 +144,21 @@ const MatchPage = () => {
       setStartingGame(true);
       setRefreshingGame(true);
       
-      if (!isLichessAuthenticated) {
+      if (!connected) {
         toast({
-          title: "Lichess Connection Required",
-          description: "You need to connect to Lichess before starting a game",
+          title: "Connection Required",
+          description: "You need to connect to the chess server before starting a game",
           variant: "default"
         });
-        setShowLichessAuth(true);
-        setRefreshingGame(false);
-        setStartingGame(false);
-        return;
+        
+        try {
+          await connect();
+        } catch (error) {
+          console.error("Error connecting to chess server:", error);
+          setRefreshingGame(false);
+          setStartingGame(false);
+          return;
+        }
       }
       
       const updatedMatch = await matchService.refreshMatch(match.id);
@@ -160,8 +166,8 @@ const MatchPage = () => {
         throw new Error("Could not refresh match data");
       }
       
-      if (updatedMatch.lichessGameId) {
-        setLichessGameId(updatedMatch.lichessGameId);
+      // If the match is already active, just set the status
+      if (updatedMatch.status === 'active') {
         setGameStatus('playing');
         setMatch(updatedMatch);
         setRefreshingGame(false);
@@ -169,51 +175,22 @@ const MatchPage = () => {
         return;
       }
       
-      const opponent = user.id === updatedMatch.whitePlayerId 
-        ? updatedMatch.blackUsername 
-        : updatedMatch.whiteUsername;
+      // Start the game via socket chess
+      await socketChessService.startMatch(match.id);
       
-      if (!opponent || opponent === 'Unknown') {
-        toast({
-          title: "Waiting for opponent",
-          description: "You need to wait for an opponent to join before starting the game",
-          variant: "default"
-        });
-        setRefreshingGame(false);
-        setStartingGame(false);
-        return;
+      // Update the match status in the database
+      await matchService.updateMatchStatus(match.id, 'active');
+      
+      // Refresh the match data
+      const finalUpdatedMatch = await matchService.refreshMatch(match.id);
+      if (finalUpdatedMatch) {
+        setMatch(finalUpdatedMatch);
+        setGameStatus('playing');
       }
-      
-      console.log(`Creating challenge for opponent: ${opponent}`);
-      const challengeId = await lichessApi.createChallenge(
-        opponent,
-        updatedMatch.timeControl,
-        updatedMatch.stake > 0 ? 'rated' : 'casual'
-      );
-      
-      if (!challengeId) {
-        throw new Error("Failed to create Lichess challenge");
-      }
-      
-      console.log(`Challenge created: ${challengeId}`);
-      const updateSuccess = await matchService.updateLichessGameId(updatedMatch.id, challengeId);
-      
-      if (!updateSuccess) {
-        throw new Error("Failed to update match with Lichess game ID");
-      }
-      
-      setLichessGameId(challengeId);
-      setGameStatus('playing');
       
       toast({
         title: "Game Started",
         description: "Your chess match has begun!",
-      });
-      
-      setMatch({
-        ...updatedMatch,
-        lichessGameId: challengeId,
-        status: 'active'
       });
     } catch (error) {
       console.error("Error starting game:", error);
@@ -230,37 +207,32 @@ const MatchPage = () => {
   };
 
   const handleCreateOpenChallenge = async () => {
-    if (!match) return;
+    if (!match || !connected) return;
     
     try {
       setCreatingOpenChallenge(true);
       
-      const { challengeId, challengeUrl } = await lichessApi.createOpenChallenge(
-        match.timeControl,
-        match.stake > 0 ? 'rated' : 'casual'
-      );
-      
-      if (!challengeId || !challengeUrl) {
-        throw new Error("Failed to create open challenge on Lichess");
-      }
-      
-      console.log(`Open challenge created: ${challengeId}, URL: ${challengeUrl}`);
-      const updateSuccess = await matchService.updateLichessGameId(match.id, challengeUrl);
-      
-      if (!updateSuccess) {
-        throw new Error("Failed to update match with challenge URL");
-      }
-      
-      setChallengeUrl(challengeUrl);
-      setMatch({
-        ...match,
-        lichessGameId: challengeUrl,
-        status: 'active'
+      // Create an open challenge via socket chess
+      await createMatch({
+        timeControl: match.timeControl,
+        gameMode: match.gameMode,
+        stake: match.stake,
+        id: match.id
       });
+      
+      // Update the match status in the database
+      await matchService.updateMatchStatus(match.id, 'active');
+      
+      // Refresh the match data
+      const updatedMatch = await matchService.refreshMatch(match.id);
+      if (updatedMatch) {
+        setMatch(updatedMatch);
+        setGameStatus('playing');
+      }
       
       toast({
         title: "Challenge Created",
-        description: "Share the link with your opponent to start the game",
+        description: "Open challenge created. Waiting for opponents to join.",
       });
     } catch (error) {
       console.error("Error creating open challenge:", error);
@@ -273,47 +245,9 @@ const MatchPage = () => {
       setCreatingOpenChallenge(false);
     }
   };
-
-  const handleShareChallengeLink = () => {
-    if (!challengeUrl) return;
-    
-    navigator.clipboard.writeText(challengeUrl)
-      .then(() => {
-        toast({
-          title: "Link Copied",
-          description: "Challenge link copied to clipboard",
-        });
-      })
-      .catch(err => {
-        console.error("Could not copy text: ", err);
-        toast({
-          title: "Error",
-          description: "Could not copy link. Please try manually copying it.",
-          variant: "destructive"
-        });
-      });
-  };
-
-  const handleLichessAuth = async () => {
-    try {
-      await connectToLichess();
-      setShowLichessAuth(false);
-      
-      setTimeout(() => {
-        handleStartGame();
-      }, 1000);
-    } catch (error) {
-      console.error("Error authenticating with Lichess:", error);
-      toast({
-        title: "Authentication Failed",
-        description: "Could not connect to Lichess. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
   
   const handleGameLoad = () => {
-    console.log("Game iframe loaded successfully");
+    console.log("Game loaded successfully");
   };
   
   const refreshGame = async () => {
@@ -325,14 +259,10 @@ const MatchPage = () => {
       if (refreshedMatch) {
         setMatch(refreshedMatch);
         
-        if (refreshedMatch.lichessGameId && refreshedMatch.lichessGameId !== lichessGameId) {
-          setLichessGameId(refreshedMatch.lichessGameId);
-          
-          if (refreshedMatch.lichessGameId.includes('http')) {
-            setChallengeUrl(refreshedMatch.lichessGameId);
-          }
-          
+        if (refreshedMatch.status === 'active') {
           setGameStatus('playing');
+        } else if (refreshedMatch.status === 'completed') {
+          setGameStatus('completed');
         }
       }
     } catch (error) {
@@ -371,34 +301,6 @@ const MatchPage = () => {
       </div>
     );
   }
-  
-  const handleOpenInNewTab = () => {
-    if (challengeUrl) {
-      window.open(challengeUrl, '_blank', 'noopener,noreferrer');
-      
-      toast({
-        title: "Lichess Match",
-        description: "Opening match in a new tab",
-      });
-    } else if (lichessGameId) {
-      const lichessUrl = lichessGameId.includes('http') 
-        ? lichessGameId 
-        : `https://lichess.org/${lichessGameId}`;
-      
-      window.open(lichessUrl, '_blank', 'noopener,noreferrer');
-      
-      toast({
-        title: "Lichess Match",
-        description: "Opening match in a new tab",
-      });
-    } else {
-      toast({
-        title: "No Match URL",
-        description: "No Lichess match URL available yet",
-        variant: "destructive"
-      });
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -435,57 +337,8 @@ const MatchPage = () => {
         
         <CardContent>
           <div className="flex flex-col items-center space-y-6">
-            {showLichessAuth ? (
-              <div className="text-center space-y-4 w-full p-8 border border-chess-brown/50 rounded-md">
-                <h3 className="text-xl font-semibold">Connect to Lichess</h3>
-                <p className="text-gray-400 mb-4">
-                  In a production app, you would connect to your real Lichess account using OAuth 2.0.
-                  For this demo, we'll use a mock connection.
-                </p>
-                <Button onClick={handleLichessAuth} className="bg-chess-accent hover:bg-chess-accent/80 text-black">
-                  Connect to Lichess (Demo Mode)
-                </Button>
-              </div>
-            ) : (challengeUrl && match?.status === 'active') ? (
-              <div className="w-full space-y-4">
-                <div className="bg-chess-brown/20 p-4 rounded-md text-center">
-                  <h3 className="text-lg font-semibold mb-2">Challenge Created!</h3>
-                  <p className="mb-4">Share this link with your opponent:</p>
-                  <div className="flex items-center justify-center">
-                    <input 
-                      type="text"
-                      value={challengeUrl}
-                      readOnly
-                      className="p-2 rounded-l-md bg-chess-dark border-chess-brown border text-sm w-full max-w-md"
-                    />
-                    <Button 
-                      className="rounded-l-none" 
-                      onClick={handleShareChallengeLink}
-                    >
-                      <Share2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  <div className="mt-4 flex justify-center space-x-4">
-                    <Button 
-                      onClick={handleOpenInNewTab}
-                      className="bg-chess-accent hover:bg-chess-accent/80 text-black"
-                    >
-                      Open Challenge <ExternalLink className="ml-2 h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                
-                {lichessGameId && (
-                  <LichessEmbed 
-                    gameId={lichessGameId} 
-                    onLoad={handleGameLoad} 
-                    onRetry={refreshGame}
-                  />
-                )}
-              </div>
-            ) : match?.status === 'active' && lichessGameId ? (
-              <LichessEmbed gameId={lichessGameId} onLoad={handleGameLoad} onRetry={refreshGame} />
+            {match.status === 'active' ? (
+              <SocketChessEmbed matchId={match.id} onLoad={handleGameLoad} onRetry={refreshGame} />
             ) : (
               <div className="w-full max-w-md">
                 <ChessBoard />
@@ -502,7 +355,7 @@ const MatchPage = () => {
                   <Button 
                     onClick={handleStartGame}
                     className="bg-chess-accent hover:bg-chess-accent/80 text-black"
-                    disabled={startingGame || refreshingGame || creatingOpenChallenge}
+                    disabled={startingGame || refreshingGame || creatingOpenChallenge || !connected}
                   >
                     {startingGame ? (
                       <>
@@ -520,7 +373,7 @@ const MatchPage = () => {
                   <Button 
                     onClick={handleCreateOpenChallenge}
                     variant="outline"
-                    disabled={startingGame || refreshingGame || creatingOpenChallenge}
+                    disabled={startingGame || refreshingGame || creatingOpenChallenge || !connected}
                   >
                     {creatingOpenChallenge ? (
                       <>
@@ -546,21 +399,9 @@ const MatchPage = () => {
               </div>
             )}
             
-            {match.status === 'active' && lichessGameId && !challengeUrl && (
+            {match.status === 'active' && (
               <div className="text-center space-y-4 w-full">
-                <p className="text-gray-400">
-                  Your game is in progress on Lichess.
-                </p>
                 <div className="flex justify-center space-x-4">
-                  <a 
-                    href={`https://lichess.org/${lichessGameId}`} 
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button className="bg-chess-accent hover:bg-chess-accent/80 text-black">
-                      Open Game in New Tab <ExternalLink className="ml-2 h-4 w-4" />
-                    </Button>
-                  </a>
                   <Button 
                     variant="outline" 
                     onClick={refreshGame} 
@@ -599,17 +440,6 @@ const MatchPage = () => {
           </div>
         </CardContent>
       </Card>
-      
-      {(challengeUrl || lichessGameId) && (
-        <Button 
-          variant="outline" 
-          onClick={handleOpenInNewTab}
-          className="flex items-center"
-        >
-          <Link2 className="mr-2 h-4 w-4" />
-          Open in Lichess
-        </Button>
-      )}
     </div>
   );
 };

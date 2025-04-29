@@ -1,9 +1,23 @@
+import { useState, useEffect } from 'react';
+import { useSocketChess } from '@/hooks/useSocketChess';
 
 interface ChessBoardProps {
   simplified?: boolean;
+  matchId?: string;
 }
 
-export const ChessBoard = ({ simplified = false }: ChessBoardProps) => {
+export const ChessBoard = ({ simplified = false, matchId }: ChessBoardProps) => {
+  const { gameState } = useSocketChess();
+  const [boardState, setBoardState] = useState<Array<Array<string | null>>>([]);
+  
+  useEffect(() => {
+    if (matchId && gameState) {
+      // In a real implementation, we would use the gameState to update the board
+      console.log("Received game state for match:", matchId, gameState);
+      // For now, we'll keep using the initial board state
+    }
+  }, [matchId, gameState]);
+  
   // For a simplified board, we'll just show a static board
   if (simplified) {
     return (
@@ -26,7 +40,7 @@ export const ChessBoard = ({ simplified = false }: ChessBoardProps) => {
     );
   }
   
-  // For a full board implementation
+  // For a full board implementation (if a matchId is provided, it would use that for game state)
   return (
     <div className="w-full aspect-square grid grid-cols-8 grid-rows-8 border border-chess-brown">
       {[...Array(64)].map((_, index) => {

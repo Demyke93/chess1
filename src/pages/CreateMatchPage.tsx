@@ -1,14 +1,17 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { userService } from "@/services/userService";
-import { useEffect } from "react";
+import { useSocketChess } from "@/hooks/useSocketChess";
 import { calculateFee, calculateTotalWithFee } from "@/utils/feeCalculations";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const timeControls = [
   { value: "1", label: "1 min (Bullet)" },
@@ -28,12 +31,56 @@ const CreateMatchPage = () => {
   const [stake, setStake] = useState<number>(10);
   const [timeControl, setTimeControl] = useState<string>("5");
   const [isCreating, setIsCreating] = useState<boolean>(false);
+  const { createMatch, connected, connecting, retry } = useSocketChess();
+  const [connectionError, setConnectionError] = useState<boolean>(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!user) {
       navigate("/login");
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    // Reset connection error when connection status changes
+    if (connected) {
+      setConnectionError(false);
+    }
+  }, [connected]);
+
+  // Attempt to connect when page loads
+  useEffect(() => {
+    if (!connected && !connecting && retryCount === 0) {
+      console.log("Auto-connecting to chess server on CreateMatchPage load");
+      handleRetryConnection();
+    }
+  }, [connected, connecting]); // eslint-disable-line
+
+  const handleRetryConnection = async () => {
+    setRetryCount(prev => prev + 1);
+    toast({
+      title: "Connecting",
+      description: "Attempting to connect to the chess server..."
+    });
+    
+    console.log("CreateMatchPage: Manual connection attempt initiated");
+    const success = await retry();
+    
+    if (success) {
+      setConnectionError(false);
+      toast({
+        title: "Connected",
+        description: "Successfully connected to the chess server"
+      });
+    } else {
+      setConnectionError(true);
+      toast({
+        title: "Connection Failed",
+        description: "Could not connect to the chess server. Please try again or check your network connection.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleCreateMatch = async () => {
     if (!user) {
@@ -55,10 +102,21 @@ const CreateMatchPage = () => {
       return;
     }
 
+    if (!connected) {
+      setConnectionError(true);
+      toast({
+        title: "Connection Required",
+        description: "You must be connected to the chess server to create a match",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsCreating(true);
 
     try {
-      await userService.createMatch({
+      // First, create the match in our Supabase database
+      const dbMatch = await userService.createMatch({
         whitePlayerId: user.id,
         blackPlayerId: "", // Will be filled when someone joins
         whiteUsername: user.username,
@@ -70,12 +128,33 @@ const CreateMatchPage = () => {
         gameMode: "standard", // Default to standard chess
       });
 
-      toast({
-        title: "Match created",
-        description: "Your match has been created successfully",
-      });
+      // Now, create the same match in our socket server
+      if (dbMatch) {
+        const socketMatch = await createMatch({
+          id: dbMatch.id,
+          whitePlayerId: user.id,
+          blackPlayerId: "",
+          whiteUsername: user.username,
+          blackUsername: "",
+          stake,
+          timeControl,
+          gameMode: "standard",
+          status: "pending",
+        });
 
-      navigate(`/matches`);
+        if (socketMatch) {
+          toast({
+            title: "Match created",
+            description: "Your match has been created successfully",
+          });
+
+          navigate(`/matches`);
+        } else {
+          // If socket match creation fails, we should delete the DB match
+          await userService.cancelMatch(dbMatch.id);
+          throw new Error("Failed to create match on the chess server");
+        }
+      }
     } catch (error) {
       console.error("Failed to create match:", error);
       toast({
@@ -144,6 +223,54 @@ const CreateMatchPage = () => {
               </SelectContent>
             </Select>
           </div>
+          
+          {!connected && (
+            <Alert className="bg-yellow-500/10 border border-yellow-500/30 rounded-md">
+              {connectionError ? (
+                <>
+                  <AlertCircle className="h-4 w-4 text-yellow-500" />
+                  <AlertTitle>Connection Failed</AlertTitle>
+                  <AlertDescription className="text-sm text-yellow-500 flex flex-col space-y-2">
+                    <p>Could not connect to the chess server. This might be due to:</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>Edge Function may not be deployed</li>
+                      <li>Network connectivity problems</li>
+                      <li>Server may be temporarily unavailable</li>
+                    </ul>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRetryConnection}
+                      className="mt-2 w-full sm:w-auto"
+                    >
+                      {connecting ? (
+                        <span className="flex items-center">
+                          <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                          Connecting...
+                        </span>
+                      ) : (
+                        <span className="flex items-center">
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Retry Connection
+                        </span>
+                      )}
+                    </Button>
+                  </AlertDescription>
+                </>
+              ) : (
+                <p className="text-sm text-yellow-500 flex items-center">
+                  {connecting ? (
+                    <span className="flex items-center">
+                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                      Connecting to chess server...
+                    </span>
+                  ) : (
+                    "Not connected to the chess server. You may need to refresh the page."
+                  )}
+                </p>
+              )}
+            </Alert>
+          )}
         </CardContent>
         <CardFooter className="flex justify-between">
           <Button 
@@ -154,10 +281,17 @@ const CreateMatchPage = () => {
           </Button>
           <Button 
             onClick={handleCreateMatch} 
-            disabled={isCreating || stake > user.balance}
+            disabled={isCreating || stake > user.balance || !connected}
             className="bg-chess-accent hover:bg-chess-accent/80 text-black"
           >
-            {isCreating ? "Creating..." : "Create Match"}
+            {isCreating ? (
+              <span className="flex items-center">
+                <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                Creating...
+              </span>
+            ) : (
+              "Create Match"
+            )}
           </Button>
         </CardFooter>
       </Card>

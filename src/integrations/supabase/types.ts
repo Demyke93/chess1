@@ -69,6 +69,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          chess_com_username: string | null
           created_at: string | null
           id: string
           is_demo: boolean | null
@@ -77,6 +78,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          chess_com_username?: string | null
           created_at?: string | null
           id: string
           is_demo?: boolean | null
@@ -85,6 +87,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          chess_com_username?: string | null
           created_at?: string | null
           id?: string
           is_demo?: boolean | null
