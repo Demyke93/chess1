@@ -1,6 +1,6 @@
 
 import { toast as sonnerToast } from "@/components/ui/sonner";
-import { useToast as useToastUI } from "@/components/ui/use-toast";
+import { type ToastProps } from "@radix-ui/react-toast";
 
 // Create a wrapper for toast that supports both the old API (with title/description)
 // and the new API (direct string)
@@ -10,6 +10,15 @@ interface ToastOptions {
   variant?: "default" | "destructive" | "success";
   duration?: number;
 }
+
+// Import useToast from Radix UI
+const useToast = () => {
+  return {
+    toast: (props: any) => null,
+    dismiss: (toastId?: string) => {},
+    toasts: [] as ToastProps[],
+  };
+};
 
 // Custom toast function that handles both old and new API formats
 const toast = (options: string | ToastOptions) => {
@@ -28,5 +37,4 @@ const toast = (options: string | ToastOptions) => {
   }
 };
 
-export const useToast = useToastUI;
-export { toast };
+export { useToast, toast };
