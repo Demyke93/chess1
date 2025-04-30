@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { SystemSelector } from "./SystemSelector";
 import { SystemInfoCard } from "./SystemInfoCard";
 import { SystemTabs } from "./SystemTabs";
+import { FirebaseConfigForm } from "@/components/inverter/FirebaseConfigForm";
 import type { InverterSystem, InverterSystemParameters } from "./types";
 import { toast } from "@/hooks/use-toast";
 
@@ -208,6 +210,9 @@ const Dashboard = () => {
                 </div>
               </div>
             )}
+            
+            {/* Firebase Configuration Form */}
+            <FirebaseConfigForm />
           </div>
         </div>
       </div>

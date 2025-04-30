@@ -13,7 +13,7 @@ interface DeviceStatusMonitorProps {
 export const DeviceStatusMonitor = ({
   inverterId,
   deviceData,
-  refreshInterval = 120000, // Default to 2 minutes (120,000 ms)
+  refreshInterval = 180000, // Changed to 3 minutes (180,000 ms)
 }: DeviceStatusMonitorProps) => {
   const [isOnline, setIsOnline] = useState<boolean>(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
