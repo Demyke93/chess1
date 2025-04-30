@@ -45,6 +45,14 @@ export function SystemInfoCard({
               </p>
             </>
           )}
+          {selectedSystemData.system_id && (
+            <div className="mt-2">
+              <DeviceStatusMonitor
+                inverterId={selectedSystemData.id}
+                deviceData={deviceData}
+              />
+            </div>
+          )}
         </div>
         {selectedSystemData.system_id && (
           <div>
@@ -52,14 +60,6 @@ export function SystemInfoCard({
             <p className="text-xs font-mono bg-black/60 p-1 rounded inline-block">
               {selectedSystemData.system_id}
             </p>
-            {deviceData && (
-              <div className="mt-2">
-                <DeviceStatusMonitor
-                  inverterId={selectedSystemData.id}
-                  deviceData={deviceData}
-                />
-              </div>
-            )}
           </div>
         )}
       </div>
