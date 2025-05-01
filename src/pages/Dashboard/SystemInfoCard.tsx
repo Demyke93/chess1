@@ -52,7 +52,7 @@ export function SystemInfoCard({
             <p className="text-xs font-mono bg-black/60 p-1 rounded inline-block">
               {selectedSystemData.system_id}
             </p>
-            {selectedSystemData.id && (
+            {deviceData && (
               <div className="mt-2">
                 <DeviceStatusMonitor
                   inverterId={selectedSystemData.id}

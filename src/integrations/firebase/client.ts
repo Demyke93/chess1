@@ -3,27 +3,11 @@ import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, get } from 'firebase/database';
 import { supabase } from '@/integrations/supabase/client';
 
-// Get the Firebase configuration
-const getFirebaseConfig = () => {
-  // Try to get config from localStorage
-  try {
-    const savedConfig = localStorage.getItem('firebase_config');
-    if (savedConfig) {
-      return JSON.parse(savedConfig);
-    }
-  } catch (error) {
-    console.error('Error loading Firebase config, using default:', error);
-  }
-  
-  // Fallback to default if config can't be loaded
-  return {
-    apiKey: "AIzaSyCaJJ-2ExS5uGcH7jQ_9jwbHFIKLrj8J54",
-    databaseURL: "https://powerverter-pro-default-rtdb.firebaseio.com/",
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyCaJJ-2ExS5uGcH7jQ_9jwbHFIKLrj8J54",
+  databaseURL: "https://powerverter-pro-default-rtdb.firebaseio.com/",
 };
 
-// Initialize Firebase with the config
-const firebaseConfig = getFirebaseConfig();
 const app = initializeApp(firebaseConfig);
 export const firebaseDb = getDatabase(app);
 

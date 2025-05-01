@@ -81,27 +81,20 @@ export const PowerConsumptionChart = ({ systemCapacity }: PowerConsumptionChartP
             dataKey="hour" 
             stroke="#999" 
             tickFormatter={(value) => value.split(':')[0]} 
-            tick={{ fontSize: isMobile ? 10 : 12, fill: "#FFFFFF" }}
+            tick={{ fontSize: isMobile ? 10 : 12 }}
             interval={isMobile ? 2 : 1}
           />
           <YAxis 
             stroke="#999" 
             domain={[0, maxValue]} 
             tickFormatter={(value) => `${value}W`} 
-            tick={{ fontSize: isMobile ? 10 : 12, fill: "#FFFFFF" }}
+            tick={{ fontSize: isMobile ? 10 : 12 }}
             width={isMobile ? 40 : 45}
           />
           <ChartTooltip 
             content={
               <ChartTooltipContent 
                 formatter={(value, name) => [`${value}W`, name === "surgeThreshold" ? "Surge Threshold" : "Power"]}
-                contentStyle={{ 
-                  backgroundColor: "rgba(0, 0, 0, 0.85)", 
-                  border: "1px solid #F97316", 
-                  color: "#FFFFFF",
-                  fontWeight: "bold"
-                }}
-                labelStyle={{ color: "#FFFFFF", fontWeight: "bold" }}
               />
             } 
           />
@@ -114,21 +107,13 @@ export const PowerConsumptionChart = ({ systemCapacity }: PowerConsumptionChartP
           <ReferenceLine 
             y={systemCapacity * 0.85} 
             stroke="#EF4444" 
-            strokeWidth={2}
             strokeDasharray="3 3" 
-            label={{
-              value: "Surge",
-              position: "insideTopRight",
-              fill: "#FFFFFF",
-              fontSize: 12,
-              fontWeight: "bold"
-            }}
+            label={isMobile ? null : { value: "Surge", position: "insideBottomRight", fill: "#EF4444", fontSize: 12 }} 
           />
           <Area 
             type="monotone" 
             dataKey="power" 
             stroke="#F97316" 
-            strokeWidth={2}
             fillOpacity={1}
             fill="url(#powerGradient)" 
           />

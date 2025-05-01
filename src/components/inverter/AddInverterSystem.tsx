@@ -127,6 +127,9 @@ export const AddInverterSystem = ({ onSuccess }: { onSuccess: () => void }) => {
               required
               className="bg-black/60 border-orange-500/30 text-white"
             />
+            <p className="text-xs text-gray-400">
+              The system ID will be automatically prefixed with "_" when writing to the device database
+            </p>
           </div>
           <Button 
             type="submit" 

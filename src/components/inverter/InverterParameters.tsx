@@ -1,5 +1,7 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Battery, Gauge, Power, Zap, AlertTriangle } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import { useState } from "react";
 
 interface ParameterProps {
@@ -26,10 +28,13 @@ interface ParameterProps {
 }
 
 export const InverterParameters = ({ data, showAdvanced }: ParameterProps) => {
-  const [surgeThreshold] = useState(85); // Default 85%
+  const [surgeThreshold, setSurgeThreshold] = useState(85); // Default 85%
   const isPowerSurge = data.output_power && data.output_capacity 
     ? (data.output_power / data.output_capacity) > (surgeThreshold / 100)
     : false;
+
+  // Check for power surge (above 85% of capacity)
+  
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -116,6 +121,21 @@ export const InverterParameters = ({ data, showAdvanced }: ParameterProps) => {
               </div>
             </CardContent>
           </Card>
+
+          <div className="md:col-span-2 lg:col-span-4 p-4 bg-black/40 border border-orange-500/20 rounded-lg">
+            <h3 className="text-lg font-semibold text-white mb-4">Surge Threshold Configuration</h3>
+            <div className="flex items-center gap-4">
+              <Slider
+                value={[surgeThreshold]}
+                onValueChange={(values) => setSurgeThreshold(values[0])}
+                max={100}
+                min={50}
+                step={1}
+                className="flex-1"
+              />
+              <span className="text-white min-w-[4rem]">{surgeThreshold}%</span>
+            </div>
+          </div>
         </>
       )}
     </div>

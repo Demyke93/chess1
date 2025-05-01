@@ -348,7 +348,6 @@ export type Database = {
         Row: {
           capacity: number | null
           created_at: string
-          firebase_id: string | null
           id: string
           location: string | null
           model: string | null
@@ -360,7 +359,6 @@ export type Database = {
         Insert: {
           capacity?: number | null
           created_at?: string
-          firebase_id?: string | null
           id?: string
           location?: string | null
           model?: string | null
@@ -372,7 +370,6 @@ export type Database = {
         Update: {
           capacity?: number | null
           created_at?: string
-          firebase_id?: string | null
           id?: string
           location?: string | null
           model?: string | null
