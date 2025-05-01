@@ -13,12 +13,22 @@ interface SystemTabsProps {
   showAdvanced: boolean;
   deviceData: string | null;
   inverterId: string;
+  firebaseData: any;
 }
 
-export const SystemTabs = ({ parameters, showAdvanced, deviceData, inverterId }: SystemTabsProps) => {
+export const SystemTabs = ({ 
+  parameters, 
+  showAdvanced, 
+  deviceData, 
+  inverterId,
+  firebaseData 
+}: SystemTabsProps) => {
   // Calculate system capacity for PowerConsumptionChart
   const systemCapacity = parameters?.output_capacity || 3000;
   const isMobile = useIsMobile();
+
+  // Extract power data from Firebase for the chart
+  const power = firebaseData?.power === 1 ? (firebaseData?.output_power || firebaseData?.real_power || 0) : 0;
 
   return (
     <Tabs defaultValue="overview" className="w-full">
@@ -32,7 +42,11 @@ export const SystemTabs = ({ parameters, showAdvanced, deviceData, inverterId }:
         {parameters && (
           <InverterParameters data={parameters} showAdvanced={showAdvanced} />
         )}
-        <PowerConsumptionChart systemCapacity={systemCapacity} />
+        <PowerConsumptionChart 
+          systemCapacity={systemCapacity} 
+          currentPower={power}
+          firebaseData={firebaseData}
+        />
       </TabsContent>
       
       <TabsContent value="controls" className="space-y-4">
@@ -41,7 +55,13 @@ export const SystemTabs = ({ parameters, showAdvanced, deviceData, inverterId }:
       
       <TabsContent value="data" className="space-y-4">
         <DeviceStatusMonitor inverterId={inverterId} />
-        {deviceData && <InverterDataDisplay deviceData={deviceData} inverterId={inverterId} />}
+        {(deviceData || firebaseData) && (
+          <InverterDataDisplay 
+            deviceData={deviceData} 
+            inverterId={inverterId} 
+            firebaseData={firebaseData} 
+          />
+        )}
       </TabsContent>
     </Tabs>
   );

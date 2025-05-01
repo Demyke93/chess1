@@ -14,17 +14,34 @@ import {
   ReferenceLine
 } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useEffect, useState } from "react";
 
-// Generate demo data for the chart
-const generateHourlyData = (capacity: number) => {
+// Generate demo data for the chart with real current value
+const generateHourlyData = (capacity: number, currentPower: number = 0) => {
   const hours = Array.from({ length: 24 }, (_, i) => i);
+  const currentHour = new Date().getHours();
+  
   return hours.map(hour => {
-    // Create a power surge around 7-8PM for demonstration
-    const baseline = Math.random() * 0.5 * capacity; // 0-50% of capacity as baseline
+    // Create a power curve based on time of day
     const isPeak = hour >= 18 && hour <= 21; 
-    const power = isPeak 
-      ? baseline + (Math.random() * 0.5 * capacity) // Potentially 50-100% of capacity during peak
-      : baseline;
+    const isMorning = hour >= 6 && hour <= 9;
+    const baseline = Math.random() * 0.3 * capacity; // 0-30% of capacity as baseline
+    
+    // Use the real value for the current hour
+    if (hour === currentHour) {
+      return {
+        hour: `${hour}:00`,
+        power: currentPower || Math.round(baseline), // Use real power or fallback
+        surgeThreshold: Math.round(capacity * 0.85)
+      };
+    }
+    
+    // Generate simulated values for other hours
+    let power = isPeak 
+      ? baseline + (Math.random() * 0.5 * capacity) // Higher during peak
+      : isMorning
+        ? baseline + (Math.random() * 0.3 * capacity) // Medium during morning
+        : baseline; // Baseline during other times
     
     return {
       hour: `${hour}:00`,
@@ -36,12 +53,32 @@ const generateHourlyData = (capacity: number) => {
 
 interface PowerConsumptionChartProps {
   systemCapacity: number;
+  currentPower?: number;
+  firebaseData?: any;
 }
 
-export const PowerConsumptionChart = ({ systemCapacity }: PowerConsumptionChartProps) => {
-  const data = generateHourlyData(systemCapacity);
-  const maxValue = systemCapacity * 1.1; // 110% of capacity for chart upper bound
+export const PowerConsumptionChart = ({ 
+  systemCapacity, 
+  currentPower = 0,
+  firebaseData
+}: PowerConsumptionChartProps) => {
+  const [data, setData] = useState<any[]>([]);
   const isMobile = useIsMobile();
+
+  // Update chart data when currentPower changes
+  useEffect(() => {
+    // Extract power from firebaseData if available
+    let realPower = currentPower;
+    if (firebaseData) {
+      realPower = firebaseData.power === 1 
+        ? (firebaseData.output_power || firebaseData.real_power || firebaseData.power_output || currentPower) 
+        : 0;
+    }
+    
+    setData(generateHourlyData(systemCapacity, realPower));
+  }, [currentPower, systemCapacity, firebaseData]);
+
+  const maxValue = systemCapacity * 1.1; // 110% of capacity for chart upper bound
 
   const chartConfig = {
     power: {

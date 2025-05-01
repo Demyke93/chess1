@@ -10,6 +10,7 @@ interface SystemInfoCardProps {
   setShowAdvanced: (show: boolean) => void;
   handleSignOut: () => void;
   isMobile: boolean;
+  firebaseData?: any;
 }
 
 export function SystemInfoCard({
@@ -19,8 +20,10 @@ export function SystemInfoCard({
   setShowAdvanced,
   handleSignOut,
   isMobile,
+  firebaseData,
 }: SystemInfoCardProps) {
   if (!selectedSystemData) return null;
+  
   return (
     <div className="p-4 bg-black/40 border border-orange-500/20 rounded-lg">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -35,13 +38,18 @@ export function SystemInfoCard({
           <p className="text-xs text-gray-300">
             Model: {selectedSystemData.model}
           </p>
-          {deviceData && (
+          {firebaseData && (
             <>
               <p className="text-xs text-gray-300">
-                System Voltage: {deviceData.split(",")[8] || "N/A"}V
+                System Voltage: {firebaseData.voltage || firebaseData.output_voltage || "N/A"}V
               </p>
               <p className="text-xs text-gray-300">
-                System Capacity: {deviceData.split(",")[9] || "N/A"} kVA
+                System Capacity: {selectedSystemData.capacity || "N/A"} W
+              </p>
+              <p className="text-xs text-gray-300">
+                Power Status: <span className={firebaseData.power === 1 ? "text-green-400" : "text-red-400"}>
+                  {firebaseData.power === 1 ? "ON" : "OFF"}
+                </span>
               </p>
             </>
           )}
@@ -52,14 +60,12 @@ export function SystemInfoCard({
             <p className="text-xs font-mono bg-black/60 p-1 rounded inline-block">
               {selectedSystemData.system_id}
             </p>
-            {deviceData && (
-              <div className="mt-2">
-                <DeviceStatusMonitor
-                  inverterId={selectedSystemData.id}
-                  deviceData={deviceData}
-                />
-              </div>
-            )}
+            <div className="mt-2">
+              <DeviceStatusMonitor
+                inverterId={selectedSystemData.id}
+                deviceData={deviceData}
+              />
+            </div>
           </div>
         )}
       </div>

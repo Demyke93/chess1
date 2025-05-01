@@ -7,7 +7,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface InverterDataDisplayProps {
   inverterId: string;
-  deviceData?: string; // The comma-separated data string from the device
+  deviceData?: string | null; // The comma-separated data string from the device
+  firebaseData?: any; // Firebase realtime data
 }
 
 interface ParsedData {
@@ -37,11 +38,52 @@ interface ParsedData {
   lastUserEnergy?: string;
 }
 
-export const InverterDataDisplay = ({ inverterId, deviceData }: InverterDataDisplayProps) => {
+export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: InverterDataDisplayProps) => {
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const isMobile = useIsMobile();
 
+  // Parse device data or use Firebase data
   useEffect(() => {
+    // Priority to Firebase data if available
+    if (firebaseData) {
+      // Map Firebase data to our data format
+      const data: ParsedData = {
+        voltage: firebaseData.voltage || firebaseData.output_voltage || 220,
+        current: firebaseData.current || 0,
+        power: firebaseData.real_power || firebaseData.power_output || 0,
+        energy: firebaseData.energy || firebaseData.energy_kwh || 0,
+        frequency: firebaseData.frequency || 50,
+        powerFactor: firebaseData.power_factor || 0.9,
+        mainsPresent: !!firebaseData.mains_present,
+        solarPresent: !!firebaseData.solar_present,
+        nominalVoltage: firebaseData.nominal_voltage || 220,
+        deviceCapacity: firebaseData.device_capacity || 3000,
+        batteryVoltage: firebaseData.battery_voltage || 24,
+        apparentPower: firebaseData.apparent_power || 0,
+        reactivePower: firebaseData.reactive_power || 0,
+        voltagePeakPeak: firebaseData.voltage_peak_peak || 310,
+        currentPeakPeak: firebaseData.current_peak_peak || 0,
+        batteryPercentage: firebaseData.battery_percentage || 0,
+        loadPercentage: firebaseData.load_percentage || 0,
+        analogReading: firebaseData.analog_reading || 0,
+        surgeResult: firebaseData.surge_result || "",
+        powerControl: firebaseData.power || 0,
+        randomValue: firebaseData.random_value || 0,
+        inverterState: firebaseData.power === 1,
+        lastUserPower: firebaseData.lastUserPower,
+        lastUserEnergy: firebaseData.lastUserEnergy
+      };
+      
+      // Calculate load percentage if not provided
+      if (!data.loadPercentage && data.power && data.deviceCapacity) {
+        data.loadPercentage = (data.power / data.deviceCapacity) * 100;
+      }
+      
+      setParsedData(data);
+      return;
+    }
+    
+    // Fallback to string-based device data if Firebase data isn't available
     if (!deviceData) return;
     
     try {
@@ -80,7 +122,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData }: InverterDataDisp
     } catch (error) {
       console.error("Error parsing device data:", error);
     }
-  }, [deviceData]);
+  }, [deviceData, firebaseData]);
 
   if (!parsedData) {
     return (
@@ -163,7 +205,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData }: InverterDataDisp
               </div>
               <div className="flex justify-between text-xs text-gray-300">
                 <span>0W</span>
-                <span>{parsedData.deviceCapacity * 1000}W</span>
+                <span>{parsedData.deviceCapacity}W</span>
               </div>
               <p className="text-xs text-gray-300">Load: {parsedData.loadPercentage.toFixed(1)}%</p>
             </div>
@@ -223,6 +265,30 @@ export const InverterDataDisplay = ({ inverterId, deviceData }: InverterDataDisp
                     Inverter {parsedData.inverterState ? 'On' : 'Off'}
                   </span>
                 </div>
+                
+                {/* Load states from Firebase data if available */}
+                {firebaseData && Object.keys(firebaseData).some(key => key.startsWith('load_')) && (
+                  <div className="mt-1 pt-1 border-t border-gray-700">
+                    <p className="text-xs text-gray-400 mb-1">Load States:</p>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[1, 2, 3, 4, 5, 6].map(loadNum => {
+                        const loadKey = `load_${loadNum}`;
+                        const loadState = firebaseData[loadKey];
+                        if (loadState !== undefined) {
+                          return (
+                            <div key={loadKey} className="flex items-center text-xs">
+                              <div className={`w-2 h-2 rounded-full mr-1 ${loadState === 1 ? 'bg-green-500' : 'bg-gray-600'}`}></div>
+                              <span className={loadState === 1 ? 'text-green-400' : 'text-gray-400'}>
+                                L{loadNum}
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -230,7 +296,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData }: InverterDataDisp
       </div>
 
       {/* Activity Log */}
-      {(parsedData.lastUserPower || parsedData.lastUserEnergy) && (
+      {(parsedData.lastUserPower || parsedData.lastUserEnergy || firebaseData?.lastUpdate) && (
         <Card className="bg-black/40 border-orange-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-white">Recent Activity</CardTitle>
@@ -241,6 +307,12 @@ export const InverterDataDisplay = ({ inverterId, deviceData }: InverterDataDisp
             )}
             {parsedData.lastUserEnergy && (
               <p className="text-gray-300">Energy Reset: {parsedData.lastUserEnergy}</p>
+            )}
+            {firebaseData?.lastUpdate && (
+              <p className="text-gray-300">Last Update: {new Date(firebaseData.lastUpdate).toLocaleString()}</p>
+            )}
+            {firebaseData?.lastUserPower && (
+              <p className="text-gray-300">Last User: {firebaseData.lastUserPower}</p>
             )}
           </CardContent>
         </Card>
