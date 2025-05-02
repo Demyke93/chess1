@@ -41,9 +41,9 @@ export const InverterParameters = ({
   const currentPower = parseFloat(data.real_power?.toString() || data.output_power?.toString() || '0');
 
   console.log("InverterParameters power data (FIXED):", {
-    realPower: data.real_power,
-    outputPower: data.output_power,
-    currentPower: currentPower,
+    realPower: data.real_power,//the powers are the same
+    outputPower: data.real_power,//the powers are the same
+    currentPower: data.real_power,//the powers are the same
     systemCapacityWatts: systemCapacityWatts
   });
 
