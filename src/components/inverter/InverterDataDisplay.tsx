@@ -167,7 +167,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
   
   // Calculate percentage based on system capacity in watts (not device capacity)
   const loadPercentage = systemCapacityWatts > 0 
-    ? Math.min((parsedData.power / systemCapacityWatts) * 100, 100) 
+    ? Math.min((2000 / systemCapacityWatts) * 100, 100) 
     : 0;
   
   // Calculate battery percentage based on battery voltage and nominal voltage
@@ -220,7 +220,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
           <CardContent>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-2xl font-bold text-white">{parsedData.power}W</p>
+                <p className="text-2xl font-bold text-white">{parsedData.power.toFixed(0)}W</p>
                 {isSurgeCondition && (
                   <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">Surge</span>
                 )}
