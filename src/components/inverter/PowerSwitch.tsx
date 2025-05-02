@@ -1,7 +1,7 @@
 
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Power } from "lucide-react";
+import { Icons } from "@/components/ui/icon";
 import { toast } from "@/hooks/use-toast";
 import { useInverterAndLoadsSwitches } from "./useInverterAndLoadsSwitches";
 
@@ -36,7 +36,7 @@ export const PowerSwitch = ({ inverterId, initialState = false }: PowerSwitchPro
   return (
     <div className="flex items-center justify-between p-4 bg-black/40 rounded-lg">
       <div className="flex items-center space-x-2">
-        <Power className={`h-5 w-5 ${inverterState ? "text-orange-500" : "text-gray-500"}`} />
+        <Icons.Power className={`h-5 w-5 ${inverterState ? "text-orange-500" : "text-gray-500"}`} />
         <Label htmlFor={`power-switch-${inverterId}`} className="text-white">
           {inverterState ? "System On" : "System Off"}
         </Label>

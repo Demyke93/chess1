@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeviceStatusMonitor } from "./DeviceStatusMonitor";
-import { Battery, Zap, Power, Settings, AlertTriangle } from "lucide-react";
+import { Icons } from "@/components/ui/icon";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useInverterAndLoadsSwitches } from "./useInverterAndLoadsSwitches";
 
@@ -188,7 +189,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
         <Card className="bg-black/40 border-orange-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-white">Battery Status</CardTitle>
-            <Battery className={`h-4 w-4 ${calculatedBatteryPercentage < 20 ? 'text-red-500' : 'text-orange-500'}`} />
+            <Icons.Battery className={`h-4 w-4 ${calculatedBatteryPercentage < 20 ? 'text-red-500' : 'text-orange-500'}`} />
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -199,21 +200,21 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
               </p>
               {calculatedBatteryPercentage < 20 && (
                 <p className="text-xs text-red-400 flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" /> Low Battery
+                  <Icons.AlertTriangle className="h-3 w-3" /> Low Battery
                 </p>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Power Output Card - UPDATED to match Output Parameters card from InverterParameters.tsx */}
+        {/* Power Output Card */}
         <Card className={`bg-black/40 ${isSurgeCondition ? 'border-red-500/50' : 'border-orange-500/20'}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-white">Power Output</CardTitle>
             {isSurgeCondition ? (
-              <AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" />
+              <Icons.AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" />
             ) : (
-              <Power className="h-4 w-4 text-orange-500" />
+              <Icons.Power className="h-4 w-4 text-orange-500" />
             )}
           </CardHeader>
           <CardContent>
@@ -247,7 +248,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
         <Card className="bg-black/40 border-orange-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-white">Electrical Params</CardTitle>
-            <Zap className="h-4 w-4 text-orange-500" />
+            <Icons.Zap className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -272,7 +273,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
         <Card className="bg-black/40 border-orange-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-white">Energy & Source</CardTitle>
-            <Settings className="h-4 w-4 text-orange-500" />
+            <Icons.Settings className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
             <div className="space-y-2">

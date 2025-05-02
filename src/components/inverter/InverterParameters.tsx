@@ -1,6 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Battery, Gauge, Power, Zap, AlertTriangle } from "lucide-react";
+import { Icons } from "@/components/ui/icon";
 
 interface ParameterProps {
   data: {
@@ -66,7 +66,7 @@ export const InverterParameters = ({
       <Card className="bg-black/40 border-orange-500/20">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-white">Battery Status</CardTitle>
-          <Battery className="h-4 w-4 text-orange-500" />
+          <Icons.Battery className="h-4 w-4 text-orange-500" />
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -82,7 +82,7 @@ export const InverterParameters = ({
       <Card className={`bg-black/40 border-${isPowerSurge ? 'red-500/50' : 'orange-500/20'}`}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-white">Output Parameters</CardTitle>
-          {isPowerSurge ? <AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" /> : <Power className="h-4 w-4 text-orange-500" />}
+          {isPowerSurge ? <Icons.AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" /> : <Icons.Power className="h-4 w-4 text-orange-500" />}
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -112,7 +112,7 @@ export const InverterParameters = ({
       <Card className="bg-black/40 border-orange-500/20">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-white">Power Quality</CardTitle>
-          <Zap className="h-4 w-4 text-orange-500" />
+          <Icons.Zap className="h-4 w-4 text-orange-500" />
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -128,7 +128,7 @@ export const InverterParameters = ({
           <Card className="bg-black/40 border-orange-500/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-white">Power Analysis</CardTitle>
-              <Power className="h-4 w-4 text-orange-500" />
+              <Icons.Power className="h-4 w-4 text-orange-500" />
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -142,7 +142,7 @@ export const InverterParameters = ({
           <Card className="bg-black/40 border-orange-500/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-white">AC Parameters</CardTitle>
-              <Zap className="h-4 w-4 text-orange-500" />
+              <Icons.Zap className="h-4 w-4 text-orange-500" />
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
