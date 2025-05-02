@@ -104,7 +104,7 @@ export const InverterParameters = ({
               />
             </div>
             <p className="text-xs text-gray-300">
-              Capacity: {deviceCapacity ?? 'N/A'} KVA ({systemCapacity} KW) | Load: ({load_percentage}%)
+              Capacity: {deviceCapacity ?? 'N/A'} KVA ({systemCapacity} KW) | Load: {"50"}%
             </p>
             <p className="text-xs text-gray-300">
               Voltage: {data.output_voltage?.toFixed(1) ?? 'N/A'}V
