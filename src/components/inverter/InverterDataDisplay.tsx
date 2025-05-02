@@ -224,7 +224,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
                 />
               </div>
               <p className="text-xs text-gray-300">
-                Capacity: {parsedData.deviceCapacity} KVA ({systemCapacity} KW) | Load: {loadPercentage.toFixed(1)}%
+                Capacity: {parsedData.deviceCapacity} KVA ({systemCapacity} KW) | Load: "50%"
               </p>
               <p className="text-xs text-gray-300">
                 Voltage: {parsedData.voltage.toFixed(1)}V
