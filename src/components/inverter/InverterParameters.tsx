@@ -137,7 +137,7 @@ export const InverterParameters = ({
             <CardContent>
               <div className="space-y-2">
                 <p className="text-xs text-gray-300">Apparent: {data.apparent_power?.toFixed(1) ?? 'N/A'}VA</p>
-                <p className="text-xs text-gray-300">Real: {data.real_power?.toFixed(1) ?? 'N/A'}W</p>
+                <p className="text-xs text-gray-300">Real: {power?.toFixed(1) ?? 'N/A'}W</p>
                 <p className="text-xs text-gray-300">Reactive: {data.reactive_power?.toFixed(1) ?? 'N/A'}VAR</p>
               </div>
             </CardContent>
