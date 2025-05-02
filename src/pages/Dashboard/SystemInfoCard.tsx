@@ -1,7 +1,16 @@
 
 import { DeviceStatusMonitor } from "@/components/inverter/DeviceStatusMonitor";
 import { Button } from "@/components/ui/button";
-import { InverterSystem } from "./types";
+
+interface InverterSystem {
+  id: string;
+  name: string;
+  location: string;
+  model: string;
+  system_id: string;
+  capacity?: number;
+  user_id: string;
+}
 
 interface SystemInfoCardProps {
   selectedSystemData: InverterSystem | undefined;
@@ -24,6 +33,14 @@ export function SystemInfoCard({
 }: SystemInfoCardProps) {
   if (!selectedSystemData) return null;
   
+  // Use device_capacity from Firebase if available (in KVA)
+  const deviceCapacity = firebaseData?.device_capacity || selectedSystemData.capacity || "N/A";
+  
+  // Calculate system capacity as 75% of device capacity (KVA to KW)
+  const systemCapacity = deviceCapacity !== "N/A" 
+    ? Math.round((parseFloat(deviceCapacity) * 0.75) * 100) / 100 
+    : "N/A";
+  
   return (
     <div className="p-4 bg-black/40 border border-orange-500/20 rounded-lg">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -44,7 +61,7 @@ export function SystemInfoCard({
                 System Voltage: {firebaseData.voltage || firebaseData.output_voltage || "N/A"}V
               </p>
               <p className="text-xs text-gray-300">
-                System Capacity: {selectedSystemData.capacity || "N/A"} W
+                System Capacity: {systemCapacity} KW
               </p>
               <p className="text-xs text-gray-300">
                 Power Status: <span className={firebaseData.power === 1 ? "text-green-400" : "text-red-400"}>

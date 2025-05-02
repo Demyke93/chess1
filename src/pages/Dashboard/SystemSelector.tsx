@@ -1,7 +1,16 @@
 
 import { Button } from "@/components/ui/button";
 import { DeleteInverterSystem } from "@/components/inverter/DeleteInverterSystem";
-import { InverterSystem } from "./types";
+
+interface InverterSystem {
+  id: string;
+  name: string;
+  location: string;
+  model: string;
+  system_id: string;
+  capacity?: number;
+  user_id: string;
+}
 
 interface SystemSelectorProps {
   systems: InverterSystem[];

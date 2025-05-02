@@ -1,18 +1,56 @@
 
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { AddInverterSystem } from "@/components/inverter/AddInverterSystem";
-import { PowerSwitch } from "@/components/inverter/PowerSwitch";
+import { Button } from '@/components/ui/button';
+import { PowerConsumptionChart } from '@/components/inverter/PowerConsumptionChart';
+import { InverterDataDisplay } from '@/components/inverter/InverterDataDisplay';
+import { AddInverterSystem } from '@/components/inverter/AddInverterSystem';
+import { PowerSwitch } from '@/components/inverter/PowerSwitch';
+import { FirebaseConfigForm } from '@/components/inverter/FirebaseConfigForm';
+import { AddSharedInverter } from '@/components/inverter/AddSharedInverter';
+import { LoadControlPanel } from '@/components/inverter/LoadControlPanel';
+import { DeleteInverterSystem } from '@/components/inverter/DeleteInverterSystem';
+import { toast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Plus, Zap, Trash2, Database, Loader2 } from 'lucide-react';
 import { useIsMobile } from "@/hooks/use-mobile";
+import { subscribeToDeviceData, subscribeToControlStates } from "@/integrations/firebase/client";
 import { SystemSelector } from "./SystemSelector";
 import { SystemInfoCard } from "./SystemInfoCard";
 import { SystemTabs } from "./SystemTabs";
-import type { InverterSystem, InverterSystemParameters } from "./types";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "@/hooks/use-toast";
-import { subscribeToDeviceData } from "@/integrations/firebase/client";
+
+// Define the InverterSystem interface locally if not imported
+interface InverterSystem {
+  id: string;
+  name: string;
+  location: string;
+  model: string;
+  system_id: string;
+  capacity?: number;
+  user_id: string;
+}
+
+// Define the InverterSystemParameters interface
+interface InverterSystemParameters {
+  battery_percentage: number;
+  battery_voltage: number;
+  output_capacity: number;
+  output_voltage: number;
+  output_power: number;
+  frequency: number;
+  power_factor: number;
+  mains_present: boolean;
+  solar_present: boolean;
+  energy_kwh: number;
+  apparent_power: number;
+  reactive_power: number;
+  real_power: number;
+  acv_rms: number;
+  acv_peak_peak: number;
+  acc_rms: number;
+  acc_peak_peak: number;
+}
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -22,7 +60,8 @@ const Dashboard = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [deviceData, setDeviceData] = useState<string | null>(null);
-  const [firebaseData, setFirebaseData] = useState<any>(null);
+  const [deviceStateData, setDeviceStateData] = useState<any>(null);
+  const [controlStateData, setControlStateData] = useState<any>(null);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -43,19 +82,24 @@ const Dashboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  // We'll update this function to use timestamp instead of created_at column
   useEffect(() => {
     if (!selectedSystem) return;
+    
     const fetchDeviceData = async () => {
       try {
         const selectedSystemData = systems.find(s => s.id === selectedSystem);
         if (!selectedSystemData || !selectedSystemData.system_id) return;
+        
         const { data, error } = await supabase
           .from('device_data')
-          .select('data')
+          .select('data, timestamp')  // Using timestamp instead of created_at
           .eq('device_id', selectedSystemData.system_id)
-          .order('timestamp', { ascending: false })
+          .order('timestamp', { ascending: false })  // Using timestamp for ordering
           .limit(1);
+          
         if (error) throw error;
+        
         if (data && data.length > 0 && data[0].data) {
           setDeviceData(data[0].data);
         } else {
@@ -66,29 +110,56 @@ const Dashboard = () => {
         setDeviceData(null);
       }
     };
+    
+    // Initial fetch
     fetchDeviceData();
-    const interval = setInterval(fetchDeviceData, 3000);
+    
+    // Set up interval for 1-second updates
+    const interval = setInterval(fetchDeviceData, 1000);
+    
     return () => clearInterval(interval);
   }, [selectedSystem, systems]);
 
-  // Subscribe to Firebase data when selectedSystem changes
+  // Subscribe to Firebase device data (no prefix) when selectedSystem changes
   useEffect(() => {
     if (!selectedSystem) return;
     
     const selectedSystemData = systems.find(s => s.id === selectedSystem);
     if (!selectedSystemData || !selectedSystemData.system_id) return;
     
-    console.log(`Subscribing to Firebase data for system: ${selectedSystemData.system_id}`);
+    console.log(`Subscribing to Firebase device data for system: ${selectedSystemData.system_id}`);
     
     const unsubscribe = subscribeToDeviceData(selectedSystemData.system_id, (data) => {
       if (data) {
-        setFirebaseData(data);
-        console.log("Firebase data received:", data);
+        setDeviceStateData(data);
+        console.log("Firebase device data received and state updated:", data);
       }
     });
     
     return () => {
-      console.log("Unsubscribing from Firebase");
+      console.log("Unsubscribing from Firebase device data");
+      unsubscribe();
+    };
+  }, [selectedSystem, systems]);
+
+  // Subscribe to Firebase control states (with prefix) when selectedSystem changes
+  useEffect(() => {
+    if (!selectedSystem) return;
+    
+    const selectedSystemData = systems.find(s => s.id === selectedSystem);
+    if (!selectedSystemData || !selectedSystemData.system_id) return;
+    
+    console.log(`Subscribing to Firebase control states for system: ${selectedSystemData.system_id}`);
+    
+    const unsubscribe = subscribeToControlStates(selectedSystemData.system_id, (data) => {
+      if (data) {
+        setControlStateData(data);
+        console.log("Firebase control data received and state updated:", data);
+      }
+    });
+    
+    return () => {
+      console.log("Unsubscribing from Firebase control states");
       unsubscribe();
     };
   }, [selectedSystem, systems]);
@@ -101,15 +172,9 @@ const Dashboard = () => {
         .eq('user_id', userId);
       if (error) throw error;
       
-      // Derive firebase_id from system_id if it doesn't exist
-      const systemsWithFirebaseId = (data || []).map(system => ({
-        ...system,
-        firebase_id: system.system_id ? `_${system.system_id}` : undefined
-      }));
-      
-      setSystems(systemsWithFirebaseId);
-      if (systemsWithFirebaseId.length > 0 && !selectedSystem) {
-        setSelectedSystem(systemsWithFirebaseId[0].id);
+      setSystems(data || []);
+      if (data?.length > 0 && !selectedSystem) {
+        setSelectedSystem(data[0].id);
       }
     } catch (error: any) {
       console.error('Error fetching inverter systems:', error.message);
@@ -118,30 +183,32 @@ const Dashboard = () => {
 
   // Convert Firebase data to parameters format used by components
   const getSystemParameters = (systemId: string): InverterSystemParameters | null => {
-    if (!firebaseData) return null;
+    if (!deviceStateData) return null;
     
     const selectedSystemData = systems.find(s => s.id === systemId);
     if (!selectedSystemData) return null;
 
-    // Map the Firebase data to our parameter format
+    // Map the device data to our parameter format
     return {
-      battery_percentage: firebaseData.battery_percentage || 0,
-      battery_voltage: firebaseData.battery_voltage || 0,
-      output_capacity: selectedSystemData?.capacity || 3000,
-      output_voltage: firebaseData.output_voltage || firebaseData.voltage || 220,
-      output_power: firebaseData.output_power || firebaseData.power || 0,
-      frequency: firebaseData.frequency || 50,
-      power_factor: firebaseData.power_factor || 0.9,
-      mains_present: !!firebaseData.mains_present,
-      solar_present: !!firebaseData.solar_present,
-      energy_kwh: firebaseData.energy_kwh || firebaseData.energy || 0,
-      apparent_power: firebaseData.apparent_power || 0,
-      reactive_power: firebaseData.reactive_power || 0,
-      real_power: firebaseData.real_power || firebaseData.power || 0,
-      acv_rms: firebaseData.acv_rms || firebaseData.voltage || 220,
-      acv_peak_peak: firebaseData.acv_peak_peak || 310,
-      acc_rms: firebaseData.acc_rms || firebaseData.current || 0,
-      acc_peak_peak: firebaseData.acc_peak_peak || 0,
+      battery_percentage: deviceStateData.battery_percentage || 0,
+      battery_voltage: deviceStateData.battery_voltage || 0,
+      // Use device_capacity from Firebase or fallback to system's capacity
+      output_capacity: deviceStateData.device_capacity || selectedSystemData?.capacity || 0,
+      output_voltage: deviceStateData.voltage || 0,
+      output_power: deviceStateData.power || 0,
+      // Use actual values from Firebase, no default fallbacks
+      frequency: deviceStateData.frequency || 0,
+      power_factor: deviceStateData.power_factor || 0,
+      mains_present: !!deviceStateData.mains_present,
+      solar_present: !!deviceStateData.solar_present,
+      energy_kwh: deviceStateData.energy || 0,
+      apparent_power: deviceStateData.apparent_power || 0,
+      reactive_power: deviceStateData.reactive_power || 0,
+      real_power: deviceStateData.power || 0,
+      acv_rms: deviceStateData.voltage || 0,
+      acv_peak_peak: deviceStateData.voltage_peak_peak || 0,
+      acc_rms: deviceStateData.current || 0,
+      acc_peak_peak: deviceStateData.current_peak_peak || 0,
     };
   };
 
@@ -153,8 +220,15 @@ const Dashboard = () => {
   const parameters = selectedSystem ? getSystemParameters(selectedSystem) : null;
   const selectedSystemData = systems.find(system => system.id === selectedSystem);
 
-  // Check if power is controlled by Firebase
-  const isPowerOn = firebaseData?.power === 1;
+  // Check if power is controlled by Firebase (use control state data)
+  const isPowerOn = controlStateData?.power === 1;
+
+  // Combine data for display components
+  const combinedFirebaseData = {
+    ...deviceStateData,
+    // Override with control state data (for power and loads)
+    ...(controlStateData || {}),
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black to-gray-900 text-white p-2 sm:p-6">
@@ -183,7 +257,7 @@ const Dashboard = () => {
                       setShowAdvanced={setShowAdvanced}
                       handleSignOut={handleSignOut}
                       isMobile={isMobile}
-                      firebaseData={firebaseData}
+                      firebaseData={combinedFirebaseData}
                     />
                     <PowerSwitch inverterId={selectedSystem} initialState={isPowerOn} />
                     <SystemTabs
@@ -191,7 +265,7 @@ const Dashboard = () => {
                       showAdvanced={showAdvanced}
                       deviceData={deviceData}
                       inverterId={selectedSystem}
-                      firebaseData={firebaseData}
+                      firebaseData={combinedFirebaseData}
                     />
                   </>
                 )}

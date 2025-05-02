@@ -1,9 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Battery, Gauge, Power, Zap, AlertTriangle } from "lucide-react";
-import { Slider } from "@/components/ui/slider";
-import { useState } from "react";
-
 interface ParameterProps {
   data: {
     battery_percentage?: number;
@@ -23,21 +20,48 @@ interface ParameterProps {
     acv_peak_peak?: number;
     acc_rms?: number;
     acc_peak_peak?: number;
+    nominal_voltage?: number;
   };
   showAdvanced: boolean;
+  deviceCapacity: number; // Device capacity from Firebase in KVA
 }
+export const InverterParameters = ({
+  data,
+  showAdvanced,
+  deviceCapacity
+}: ParameterProps) => {
+  // Calculate system capacity as 75% of device capacity (KVA to KW)
+  const systemCapacity = deviceCapacity ? Math.round(deviceCapacity * 0.75 * 100) / 100 : 0;
 
-export const InverterParameters = ({ data, showAdvanced }: ParameterProps) => {
-  const [surgeThreshold, setSurgeThreshold] = useState(85); // Default 85%
-  const isPowerSurge = data.output_power && data.output_capacity 
-    ? (data.output_power / data.output_capacity) > (surgeThreshold / 100)
-    : false;
+  // Convert system capacity to Watts for comparison with output_power
+  const systemCapacityWatts = systemCapacity * 1000;
 
-  // Check for power surge (above 85% of capacity)
-  
+  // FIXED: Get the actual power from data
+  // Only use non-zero power values to correctly calculate load
+  const currentPower = parseFloat(data.real_power?.toString() || data.output_power?.toString() || '0');
 
-  return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+  console.log("InverterParameters power data (FIXED):", {
+    realPower: data.real_power,
+    outputPower: data.output_power,
+    currentPower: currentPower,
+    systemCapacityWatts: systemCapacityWatts
+  });
+
+  // Set the surge threshold at 80% of system capacity
+  const isPowerSurge = systemCapacityWatts ? currentPower / systemCapacityWatts > 0.8 : false;
+
+  // Calculate load percentage based on actual power consumption and system capacity
+  const loadPercentage = systemCapacityWatts 
+    ? Math.min(Math.round((currentPower / systemCapacityWatts) * 100), 100) 
+    : 0;
+
+  // Calculate battery percentage based on battery voltage and nominal voltage if not directly available
+  const calculatedBatteryPercentage = data.battery_percentage || 
+    (data.battery_voltage && data.nominal_voltage && data.nominal_voltage > 0 
+      ? Math.min(Math.max((data.battery_voltage / data.nominal_voltage) * 100, 0), 100)
+      : 0);
+      
+  return <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card className="bg-black/40 border-orange-500/20">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-white">Battery Status</CardTitle>
@@ -45,8 +69,11 @@ export const InverterParameters = ({ data, showAdvanced }: ParameterProps) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <p className="text-2xl font-bold text-white">{data.battery_percentage}%</p>
-            <p className="text-xs text-gray-300">Voltage: {data.battery_voltage}V</p>
+            <p className="text-2xl font-bold text-white">{calculatedBatteryPercentage?.toFixed(1) ?? 'N/A'}%</p>
+            <p className="text-xs text-gray-300">
+              Voltage: {data.battery_voltage?.toFixed(1) ?? 'N/A'}V
+              {data.nominal_voltage && <span> / {data.nominal_voltage.toFixed(1)}V</span>}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -54,23 +81,28 @@ export const InverterParameters = ({ data, showAdvanced }: ParameterProps) => {
       <Card className={`bg-black/40 border-${isPowerSurge ? 'red-500/50' : 'orange-500/20'}`}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-white">Output Parameters</CardTitle>
-          {isPowerSurge ? 
-            <AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" /> : 
-            <Power className="h-4 w-4 text-orange-500" />
-          }
+          {isPowerSurge ? <AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" /> : <Power className="h-4 w-4 text-orange-500" />}
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-2xl font-bold text-white">{data.output_power}W</p>
-              {isPowerSurge && 
-                <span className="text-xs bg-red-500 text-white px-2 py-1 rounded-full">
-                  Power Surge
-                </span>
-              }
+              <p className="text-2xl font-bold text-white">{currentPower?.toFixed(0) ?? 'N/A'}W</p>
+              {isPowerSurge && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">Surge</span>}
+            </div>
+            <div className="relative w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div 
+                className={`absolute top-0 left-0 h-full rounded-full ${
+                  loadPercentage > 80 ? 'bg-red-500' : 
+                  loadPercentage > 60 ? 'bg-yellow-500' : 'bg-green-500'
+                }`} 
+                style={{ width: `${loadPercentage}%` }}
+              />
             </div>
             <p className="text-xs text-gray-300">
-              Capacity: {data.output_capacity}VA | Voltage: {data.output_voltage}V
+              Capacity: {deviceCapacity ?? 'N/A'} KVA ({systemCapacity} KW) | Load: {loadPercentage}%
+            </p>
+            <p className="text-xs text-gray-300">
+              Voltage: {data.output_voltage?.toFixed(1) ?? 'N/A'}V
             </p>
           </div>
         </CardContent>
@@ -83,16 +115,15 @@ export const InverterParameters = ({ data, showAdvanced }: ParameterProps) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <p className="text-2xl font-bold text-white">{data.power_factor}</p>
+            <p className="text-2xl font-bold text-white">{data.power_factor?.toFixed(2) ?? 'N/A'}</p>
             <p className="text-xs text-gray-300">
-              Frequency: {data.frequency}Hz
+              Frequency: {data.frequency?.toFixed(1) ?? 'N/A'}Hz
             </p>
           </div>
         </CardContent>
       </Card>
 
-      {showAdvanced && (
-        <>
+      {showAdvanced && <>
           <Card className="bg-black/40 border-orange-500/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-white">Power Analysis</CardTitle>
@@ -100,9 +131,9 @@ export const InverterParameters = ({ data, showAdvanced }: ParameterProps) => {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <p className="text-xs text-gray-300">Apparent: {data.apparent_power}VA</p>
-                <p className="text-xs text-gray-300">Real: {data.real_power}W</p>
-                <p className="text-xs text-gray-300">Reactive: {data.reactive_power}VAR</p>
+                <p className="text-xs text-gray-300">Apparent: {data.apparent_power?.toFixed(1) ?? 'N/A'}VA</p>
+                <p className="text-xs text-gray-300">Real: {data.real_power?.toFixed(1) ?? 'N/A'}W</p>
+                <p className="text-xs text-gray-300">Reactive: {data.reactive_power?.toFixed(1) ?? 'N/A'}VAR</p>
               </div>
             </CardContent>
           </Card>
@@ -114,30 +145,13 @@ export const InverterParameters = ({ data, showAdvanced }: ParameterProps) => {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <p className="text-xs text-gray-300">Voltage (RMS): {data.acv_rms}V</p>
-                <p className="text-xs text-gray-300">Voltage (P-P): {data.acv_peak_peak}V</p>
-                <p className="text-xs text-gray-300">Current (RMS): {data.acc_rms}A</p>
-                <p className="text-xs text-gray-300">Current (P-P): {data.acc_peak_peak}A</p>
+                <p className="text-xs text-gray-300">Voltage (RMS): {data.acv_rms?.toFixed(1) ?? 'N/A'}V</p>
+                <p className="text-xs text-gray-300">Voltage (P-P): {data.acv_peak_peak?.toFixed(1) ?? 'N/A'}V</p>
+                <p className="text-xs text-gray-300">Current (RMS): {data.acc_rms?.toFixed(2) ?? 'N/A'}A</p>
+                <p className="text-xs text-gray-300">Current (P-P): {data.acc_peak_peak?.toFixed(2) ?? 'N/A'}A</p>
               </div>
             </CardContent>
           </Card>
-
-          <div className="md:col-span-2 lg:col-span-4 p-4 bg-black/40 border border-orange-500/20 rounded-lg">
-            <h3 className="text-lg font-semibold text-white mb-4">Surge Threshold Configuration</h3>
-            <div className="flex items-center gap-4">
-              <Slider
-                value={[surgeThreshold]}
-                onValueChange={(values) => setSurgeThreshold(values[0])}
-                max={100}
-                min={50}
-                step={1}
-                className="flex-1"
-              />
-              <span className="text-white min-w-[4rem]">{surgeThreshold}%</span>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
+        </>}
+    </div>;
 };

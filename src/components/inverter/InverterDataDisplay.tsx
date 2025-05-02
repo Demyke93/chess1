@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeviceStatusMonitor } from "./DeviceStatusMonitor";
 import { Battery, Zap, Power, Settings, AlertTriangle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useInverterAndLoadsSwitches } from "./useInverterAndLoadsSwitches";
 
 interface InverterDataDisplayProps {
   inverterId: string;
@@ -41,6 +42,7 @@ interface ParsedData {
 export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: InverterDataDisplayProps) => {
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const isMobile = useIsMobile();
+  const { loads, inverterState } = useInverterAndLoadsSwitches(inverterId);
 
   // Parse device data or use Firebase data
   useEffect(() => {
@@ -48,37 +50,48 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
     if (firebaseData) {
       // Map Firebase data to our data format
       const data: ParsedData = {
-        voltage: firebaseData.voltage || firebaseData.output_voltage || 220,
+        voltage: firebaseData.voltage || 220,
         current: firebaseData.current || 0,
-        power: firebaseData.real_power || firebaseData.power_output || 0,
-        energy: firebaseData.energy || firebaseData.energy_kwh || 0,
+        power: firebaseData.power === 1 
+          ? (firebaseData.output_power || firebaseData.real_power || firebaseData.power_output || 0) 
+          : 0,
+        energy: firebaseData.energy || 0,
         frequency: firebaseData.frequency || 50,
         powerFactor: firebaseData.power_factor || 0.9,
-        mainsPresent: !!firebaseData.mains_present,
-        solarPresent: !!firebaseData.solar_present,
-        nominalVoltage: firebaseData.nominal_voltage || 220,
-        deviceCapacity: firebaseData.device_capacity || 3000,
+        mainsPresent: firebaseData.mains_present === true || firebaseData.mains_present === 1 || false,
+        solarPresent: firebaseData.solar_present === true || firebaseData.solar_present === 1 || false,
+        nominalVoltage: firebaseData.nominal_voltage || 24,
+        deviceCapacity: firebaseData.device_capacity || 5,
         batteryVoltage: firebaseData.battery_voltage || 24,
         apparentPower: firebaseData.apparent_power || 0,
         reactivePower: firebaseData.reactive_power || 0,
         voltagePeakPeak: firebaseData.voltage_peak_peak || 310,
         currentPeakPeak: firebaseData.current_peak_peak || 0,
-        batteryPercentage: firebaseData.battery_percentage || 0,
-        loadPercentage: firebaseData.load_percentage || 0,
+        // Use calculated battery percentage based on voltage and nominal voltage
+        batteryPercentage: 0, // Will be calculated below
+        loadPercentage: 0, // Will be calculated below
         analogReading: firebaseData.analog_reading || 0,
         surgeResult: firebaseData.surge_result || "",
-        powerControl: firebaseData.power || 0,
+        powerControl: firebaseData.power_control || 0,
         randomValue: firebaseData.random_value || 0,
-        inverterState: firebaseData.power === 1,
+        // Use the inverterState from the hook which gets data from "_" prefixed path
+        inverterState: inverterState,
         lastUserPower: firebaseData.lastUserPower,
         lastUserEnergy: firebaseData.lastUserEnergy
       };
       
-      // Calculate load percentage if not provided
-      if (!data.loadPercentage && data.power && data.deviceCapacity) {
-        data.loadPercentage = (data.power / data.deviceCapacity) * 100;
+      // Calculate battery percentage based on voltage and nominal voltage
+      if (data.batteryVoltage && data.nominalVoltage && data.nominalVoltage > 0) {
+        data.batteryPercentage = Math.min(Math.max((data.batteryVoltage / data.nominalVoltage) * 100, 0), 100);
       }
       
+      // Calculate load percentage based on system capacity (75% of device capacity in KVA)
+      const systemCapacityWatts = data.deviceCapacity ? (data.deviceCapacity * 0.75 * 1000) : 3000;
+      if (data.power && systemCapacityWatts > 0) {
+        data.loadPercentage = (data.power / systemCapacityWatts) * 100;
+      }
+      
+      console.log("Updated parsed data from Firebase:", data);
       setParsedData(data);
       return;
     }
@@ -100,29 +113,41 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
         powerFactor: parseFloat(values[5]) || 0,
         mainsPresent: values[6] === "1",
         solarPresent: values[7] === "1",
-        nominalVoltage: parseFloat(values[8]) || 0,
-        deviceCapacity: parseFloat(values[9]) || 0,
+        nominalVoltage: parseFloat(values[8]) || 24,
+        deviceCapacity: parseFloat(values[9]) || 5,
         batteryVoltage: parseFloat(values[10]) || 0,
         apparentPower: parseFloat(values[11]) || 0,
         reactivePower: parseFloat(values[12]) || 0,
         voltagePeakPeak: parseFloat(values[13]) || 0,
         currentPeakPeak: parseFloat(values[14]) || 0,
-        batteryPercentage: parseFloat(values[15]) || 0,
-        loadPercentage: parseFloat(values[16]) || 0,
+        batteryPercentage: 0, // Will be calculated below
+        loadPercentage: 0, // Will be calculated below
         analogReading: parseFloat(values[17]) || 0,
         surgeResult: values[18] || "",
         powerControl: parseInt(values[19]) || 0,
         randomValue: parseInt(values[20]) || 0,
-        inverterState: values[21] === "1" || values[21] === "true",
-        lastUserPower: values.length > 22 ? values[22] : undefined,
-        lastUserEnergy: values.length > 23 ? values[23] : undefined
+        // Use the inverterState from the hook which gets data from "_" prefixed path
+        inverterState: inverterState,
+        lastUserPower: "",
+        lastUserEnergy: ""
       };
+      
+      // Recalculate battery percentage based on voltage and nominal voltage
+      if (data.batteryVoltage && data.nominalVoltage && data.nominalVoltage > 0) {
+        data.batteryPercentage = Math.min(Math.max((data.batteryVoltage / data.nominalVoltage) * 100, 0), 100);
+      }
+      
+      // Recalculate load percentage based on system capacity (75% of device capacity in KVA)
+      const systemCapacityWatts = data.deviceCapacity ? (data.deviceCapacity * 0.75 * 1000) : 3000;
+      if (data.power && systemCapacityWatts > 0) {
+        data.loadPercentage = (data.power / systemCapacityWatts) * 100;
+      }
       
       setParsedData(data);
     } catch (error) {
       console.error("Error parsing device data:", error);
     }
-  }, [deviceData, firebaseData]);
+  }, [deviceData, firebaseData, inverterState]);
 
   if (!parsedData) {
     return (
@@ -131,8 +156,25 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       </div>
     );
   }
+  
+  // Calculate system capacity (KW) as 75% of device capacity (KVA)
+  const systemCapacity = parsedData.deviceCapacity ? Math.round((parsedData.deviceCapacity * 0.75) * 100) / 100 : 0;
 
-  const isSurgeCondition = parsedData.loadPercentage > 80;
+  // Convert system capacity from KW to W for the progress bar
+  const systemCapacityWatts = systemCapacity * 1000;
+  
+  // Use system capacity (W) for load percentage calculation and surge detection
+  const isSurgeCondition = parsedData.power > (systemCapacityWatts * 0.8);
+  
+  // Calculate percentage based on system capacity in watts (not device capacity)
+  const loadPercentage = systemCapacityWatts > 0 
+    ? Math.min((parsedData.power / systemCapacityWatts) * 100, 100) 
+    : 0;
+  
+  // Calculate battery percentage based on battery voltage and nominal voltage
+  const calculatedBatteryPercentage = (parsedData.batteryVoltage && parsedData.nominalVoltage && parsedData.nominalVoltage > 0) 
+    ? Math.min(Math.max((parsedData.batteryVoltage / parsedData.nominalVoltage) * 100, 0), 100)
+    : parsedData.batteryPercentage;
   
   return (
     <div className="space-y-4">
@@ -144,28 +186,20 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       </div>
       
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Battery Card */}
+        {/* Battery Card - Using same format as in InverterParameters.tsx */}
         <Card className="bg-black/40 border-orange-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-white">Battery Status</CardTitle>
-            <Battery className={`h-4 w-4 ${parsedData.batteryPercentage < 20 ? 'text-red-500' : 'text-orange-500'}`} />
+            <Battery className={`h-4 w-4 ${calculatedBatteryPercentage < 20 ? 'text-red-500' : 'text-orange-500'}`} />
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <div className="relative w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                <div 
-                  className={`absolute top-0 left-0 h-full rounded-full ${
-                    parsedData.batteryPercentage < 20 ? 'bg-red-500' : 
-                    parsedData.batteryPercentage < 50 ? 'bg-yellow-500' : 'bg-green-500'
-                  }`} 
-                  style={{ width: `${parsedData.batteryPercentage}%` }}
-                />
-              </div>
-              <div className="flex justify-between">
-                <p className="text-2xl font-bold text-white">{parsedData.batteryPercentage.toFixed(1)}%</p>
-                <p className="text-sm text-gray-300">{parsedData.batteryVoltage.toFixed(1)}V</p>
-              </div>
-              {parsedData.batteryPercentage < 20 && (
+              <p className="text-2xl font-bold text-white">{calculatedBatteryPercentage.toFixed(1)}%</p>
+              <p className="text-xs text-gray-300">
+                Voltage: {parsedData.batteryVoltage.toFixed(1)}V
+                {parsedData.nominalVoltage && <span> / {parsedData.nominalVoltage.toFixed(1)}V</span>}
+              </p>
+              {calculatedBatteryPercentage < 20 && (
                 <p className="text-xs text-red-400 flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" /> Low Battery
                 </p>
@@ -174,7 +208,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
           </CardContent>
         </Card>
 
-        {/* Power Output Card */}
+        {/* Power Output Card - UPDATED to match Output Parameters card from InverterParameters.tsx */}
         <Card className={`bg-black/40 ${isSurgeCondition ? 'border-red-500/50' : 'border-orange-500/20'}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-white">Power Output</CardTitle>
@@ -185,29 +219,28 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
             )}
           </CardHeader>
           <CardContent>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-2xl font-bold text-white">{parsedData.power.toFixed(1)}W</p>
+                <p className="text-2xl font-bold text-white">{parsedData.power.toFixed(0)}W</p>
                 {isSurgeCondition && (
-                  <span className="text-xs bg-red-500 text-white px-2 py-1 rounded-full">
-                    Surge Alert
-                  </span>
+                  <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">Surge</span>
                 )}
               </div>
               <div className="relative w-full h-2 bg-gray-700 rounded-full overflow-hidden">
                 <div 
                   className={`absolute top-0 left-0 h-full rounded-full ${
-                    parsedData.loadPercentage > 80 ? 'bg-red-500' : 
-                    parsedData.loadPercentage > 60 ? 'bg-yellow-500' : 'bg-green-500'
+                    loadPercentage > 80 ? 'bg-red-500' : 
+                    loadPercentage > 60 ? 'bg-yellow-500' : 'bg-green-500'
                   }`} 
-                  style={{ width: `${parsedData.loadPercentage}%` }}
+                  style={{ width: `${loadPercentage}%` }}
                 />
               </div>
-              <div className="flex justify-between text-xs text-gray-300">
-                <span>0W</span>
-                <span>{parsedData.deviceCapacity}W</span>
-              </div>
-              <p className="text-xs text-gray-300">Load: {parsedData.loadPercentage.toFixed(1)}%</p>
+              <p className="text-xs text-gray-300">
+                Capacity: {parsedData.deviceCapacity} KVA ({systemCapacity} KW) | Load: {loadPercentage.toFixed(1)}%
+              </p>
+              <p className="text-xs text-gray-300">
+                Voltage: {parsedData.voltage.toFixed(1)}V
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -266,26 +299,19 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
                   </span>
                 </div>
                 
-                {/* Load states from Firebase data if available */}
-                {firebaseData && Object.keys(firebaseData).some(key => key.startsWith('load_')) && (
+                {/* Load states from hook which gets data from "_" prefixed path */}
+                {loads.length > 0 && (
                   <div className="mt-1 pt-1 border-t border-gray-700">
                     <p className="text-xs text-gray-400 mb-1">Load States:</p>
                     <div className="grid grid-cols-3 gap-1">
-                      {[1, 2, 3, 4, 5, 6].map(loadNum => {
-                        const loadKey = `load_${loadNum}`;
-                        const loadState = firebaseData[loadKey];
-                        if (loadState !== undefined) {
-                          return (
-                            <div key={loadKey} className="flex items-center text-xs">
-                              <div className={`w-2 h-2 rounded-full mr-1 ${loadState === 1 ? 'bg-green-500' : 'bg-gray-600'}`}></div>
-                              <span className={loadState === 1 ? 'text-green-400' : 'text-gray-400'}>
-                                L{loadNum}
-                              </span>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })}
+                      {loads.map((load) => (
+                        <div key={load.id} className="flex items-center text-xs">
+                          <div className={`w-2 h-2 rounded-full mr-1 ${load.state ? 'bg-green-500' : 'bg-gray-600'}`}></div>
+                          <span className={load.state ? 'text-green-400' : 'text-gray-400'}>
+                            {load.name}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

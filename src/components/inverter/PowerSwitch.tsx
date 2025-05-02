@@ -1,10 +1,8 @@
-import { useState, useEffect } from "react";
+
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Power } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { subscribeToDeviceData, setDevicePowerState } from "@/integrations/firebase/client";
-import { supabase } from "@/integrations/supabase/client";
 import { useInverterAndLoadsSwitches } from "./useInverterAndLoadsSwitches";
 
 interface PowerSwitchProps {
@@ -23,7 +21,7 @@ export const PowerSwitch = ({ inverterId, initialState = false }: PowerSwitchPro
       await setInverterAndLoads(checked);
       toast({
         title: checked ? "Inverter turned ON" : "Inverter turned OFF",
-        description: `System ${inverterId} power state changed (all states sent)`,
+        description: `Power state changed (all states sent)`,
       });
     } catch (error: any) {
       console.error('Error updating power state:', error);
