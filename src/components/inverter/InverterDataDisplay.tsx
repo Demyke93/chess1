@@ -155,9 +155,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
   const isSurgeCondition = parsedData.power > (systemCapacityWatts * 0.8);
   
   // Calculate percentage based on system capacity in watts (not device capacity)
-  const loadPercentage = systemCapacityWatts > 0 
-    ? Math.min((parsedData.power / systemCapacityWatts) * 100, 100) 
-    : 0;
+  const loadPercentage = 50;
   
   // Calculate battery percentage based on battery voltage and nominal voltage
   const calculatedBatteryPercentage = (parsedData.batteryVoltage && parsedData.nominalVoltage && parsedData.nominalVoltage > 0) 
