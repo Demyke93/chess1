@@ -15,7 +15,7 @@ interface InverterDataDisplayProps {
 interface ParsedData {
   voltage: number;
   current: number;
-  power: number;
+  load: number;
   energy: number;
   frequency: number;
   powerFactor: number;
@@ -52,7 +52,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       const data: ParsedData = {
         voltage: firebaseData.voltage || 220,
         current: firebaseData.current || 0,
-        power: firebaseData.power || 0,
+        load: firebaseData.power || 0,
         energy: firebaseData.energy || 0,
         frequency: firebaseData.frequency || 0,
         powerFactor: firebaseData.power_factor || 0.0,
@@ -85,8 +85,8 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       
       // Calculate load percentage based on system capacity (75% of device capacity in KVA)
       const systemCapacityWatts = data.deviceCapacity ? (data.deviceCapacity * 0.75 * 1000) : 0;
-      if (data.power && systemCapacityWatts > 0) {
-        data.loadPercentage = (data.power / systemCapacityWatts) * 100;
+      if (data.load && systemCapacityWatts > 0) {
+        data.loadPercentage = (data.load / systemCapacityWatts) * 100;
       }
       
       console.log("Updated parsed data from Firebase:", data);
@@ -105,7 +105,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       const data: ParsedData = {
         voltage: parseFloat(values[0]) || 0,
         current: parseFloat(values[1]) || 0,
-        power: parseFloat(values[2]) || 0,
+        load: parseFloat(values[2]) || 0,
         energy: parseFloat(values[3]) || 0,
         frequency: parseFloat(values[4]) || 0,
         powerFactor: parseFloat(values[5]) || 0,
