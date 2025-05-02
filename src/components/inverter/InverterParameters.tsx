@@ -46,8 +46,6 @@ export const InverterParameters = ({
   const currentPower = data.real_power || data.output_power || 0;
 
   console.log("InverterParameters power data:", {
-    realPower: power,
-    outputPower: power,
     currentPower: power,
     systemCapacityWatts
   });
@@ -86,7 +84,7 @@ export const InverterParameters = ({
         <CardContent>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-2xl font-bold text-white">{currentPower?.toFixed(0) ?? 'N/A'}W</p>
+              <p className="text-2xl font-bold text-white">{currentPower?.toFixed(1) ?? 'N/A'}W</p>
               {isPowerSurge && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">Surge</span>}
             </div>
             <div className="relative w-full h-2 bg-gray-700 rounded-full overflow-hidden">
