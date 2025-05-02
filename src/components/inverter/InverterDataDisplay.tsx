@@ -56,8 +56,8 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
         energy: firebaseData.energy || 0,
         frequency: firebaseData.frequency || 0,
         powerFactor: firebaseData.power_factor || 0,
-        mainsPresent: firebaseData.mains_present === true || firebaseData.mains_present === 1 || false,
-        solarPresent: firebaseData.solar_present === true || firebaseData.solar_present === 1 || false,
+        mainsPresent: firebaseData.mains_present === 1 || false,
+        solarPresent: firebaseData.solar_present === 1 || false,
         nominalVoltage: firebaseData.nominal_voltage || 0,
         deviceCapacity: firebaseData.device_capacity || 0,
         batteryVoltage: firebaseData.battery_voltage || 0,
@@ -68,14 +68,14 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
         // Use calculated battery percentage based on voltage and nominal voltage
         batteryPercentage: 0, // Will be calculated below
         loadPercentage: 0, // Will be calculated below
-        analogReading: firebaseData.analog_reading || 0,
-        surgeResult: firebaseData.surge_result || "",
-        powerControl: firebaseData.power_control || 0,
+        analogReading: firebaseData.analog_reading || 0, //should be ignored
+        surgeResult: firebaseData.surge_result || "", //should be ignored
+        powerControl: firebaseData.power_control || 0, //should be ignored
         randomValue: firebaseData.random_value || 0,
         // Use the inverterState from the hook which gets data from "_" prefixed path
-        inverterState: inverterState,
-        lastUserPower: firebaseData.lastUserPower,
-        lastUserEnergy: firebaseData.lastUserEnergy
+        inverterState: inverterState, //should be ignored
+        lastUserPower: firebaseData.lastUserPower, //should be ignored
+        lastUserEnergy: firebaseData.lastUserEnergy //should be ignored
       };
       
       // Calculate battery percentage based on voltage and nominal voltage
