@@ -53,7 +53,7 @@ export const InverterParameters = ({
   });
 
   // Set the surge threshold at 80% of system capacity
-  const isPowerSurge = systemCapacityWatts ? currentPower / systemCapacityWatts > 0.8 : false;
+  const isPowerSurge = systemCapacityWatts ? currentPower / systemCapacityWatts > 0.8 : false; 
 
   // Calculate battery percentage based on battery voltage and nominal voltage if not directly available
   const calculatedBatteryPercentage = data.battery_percentage || 
