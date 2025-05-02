@@ -1,6 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Battery, Gauge, Power, Zap, AlertTriangle } from "lucide-react";
+
 interface ParameterProps {
   data: {
     battery_percentage?: number;
@@ -36,8 +36,7 @@ export const InverterParameters = ({
   // Convert system capacity to Watts for comparison with output_power
   const systemCapacityWatts = systemCapacity * 1000;
 
-  // FIXED: Get the actual power from data
-  // Only use non-zero power values to correctly calculate load
+  // Use load (real power) value from data
   const currentPower = parseFloat(data.real_power?.toString() || data.output_power?.toString() || '0');
 
   console.log("InverterParameters power data (FIXED):", {
@@ -65,11 +64,16 @@ export const InverterParameters = ({
       <Card className="bg-black/40 border-orange-500/20">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-white">Battery Status</CardTitle>
-          <Battery className="h-4 w-4 text-orange-500" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="1" y="6" width="18" height="12" rx="2" />
+            <line x1="23" y1="13" x2="23" y2="11" />
+          </svg>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <p className="text-2xl font-bold text-white">{calculatedBatteryPercentage?.toFixed(1) ?? 'N/A'}%</p>
+            <p className="text-2xl font-bold text-white">
+              {calculatedBatteryPercentage?.toFixed(1) ?? 'N/A'}%
+            </p>
             <p className="text-xs text-gray-300">
               Voltage: {data.battery_voltage?.toFixed(1) ?? 'N/A'}V
               {data.nominal_voltage && <span> / {data.nominal_voltage.toFixed(1)}V</span>}
@@ -81,7 +85,20 @@ export const InverterParameters = ({
       <Card className={`bg-black/40 border-${isPowerSurge ? 'red-500/50' : 'orange-500/20'}`}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-white">Output Parameters</CardTitle>
-          {isPowerSurge ? <AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" /> : <Power className="h-4 w-4 text-orange-500" />}
+          {isPowerSurge ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-500 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18.36 6.64A9 9 0 0 1 20.77 15" />
+              <path d="M6.16 6.16a9 9 0 1 0 12.68 12.68" />
+              <path d="M12 2v4" />
+              <path d="m2 2 20 20" />
+            </svg>
+          )}
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -111,7 +128,9 @@ export const InverterParameters = ({
       <Card className="bg-black/40 border-orange-500/20">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-white">Power Quality</CardTitle>
-          <Zap className="h-4 w-4 text-orange-500" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -127,7 +146,12 @@ export const InverterParameters = ({
           <Card className="bg-black/40 border-orange-500/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-white">Power Analysis</CardTitle>
-              <Power className="h-4 w-4 text-orange-500" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18.36 6.64A9 9 0 0 1 20.77 15" />
+                <path d="M6.16 6.16a9 9 0 1 0 12.68 12.68" />
+                <path d="M12 2v4" />
+                <path d="m2 2 20 20" />
+              </svg>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -141,7 +165,9 @@ export const InverterParameters = ({
           <Card className="bg-black/40 border-orange-500/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-white">AC Parameters</CardTitle>
-              <Zap className="h-4 w-4 text-orange-500" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">

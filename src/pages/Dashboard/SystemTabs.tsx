@@ -50,14 +50,15 @@ export const SystemTabs = ({
   
   const isMobile = useIsMobile();
 
-  // Get actual power value from Firebase - FIXED to correctly use the power value
-  const powerValue = firebaseData?.power === 1 ? 
-    (parseFloat(firebaseData?.real_power || firebaseData?.power || 0)) : 0;
+  // Get actual load value from Firebase - using load instead of power
+  const loadValue = firebaseData?.power === 1 ? 
+    (parseFloat(firebaseData?.load || firebaseData?.real_power || 0)) : 0;
 
   console.log("Power in SystemTabs (FIXED):", {
     firebasePower: firebaseData?.power,
     firebaseRealPower: firebaseData?.real_power,
-    calculatedPower: powerValue,
+    firebaseLoad: firebaseData?.load,
+    calculatedPower: loadValue,
     rawFirebaseData: firebaseData
   });
 
@@ -65,9 +66,9 @@ export const SystemTabs = ({
   const extendedParameters = parameters ? {
     ...parameters,
     nominal_voltage: firebaseData?.nominal_voltage || parameters.nominal_voltage,
-    // FIXED: Use the actual power values from Firebase
-    real_power: parseFloat(firebaseData?.real_power || 0),
-    output_power: parseFloat(firebaseData?.real_power || 0),
+    // FIXED: Use the actual load values from Firebase
+    real_power: parseFloat(firebaseData?.load || firebaseData?.real_power || 0),
+    output_power: parseFloat(firebaseData?.load || firebaseData?.real_power || 0),
     // Ensure battery percentage is from Firebase
     battery_percentage: firebaseData?.battery_percentage || parameters.battery_percentage
   } : null;
@@ -90,7 +91,7 @@ export const SystemTabs = ({
         )}
         <PowerConsumptionChart 
           systemCapacity={systemCapacity} 
-          currentPower={parseFloat(firebaseData?.real_power || 0)}
+          currentPower={parseFloat(firebaseData?.load || firebaseData?.real_power || 0)}
           firebaseData={firebaseData}
         />
       </TabsContent>

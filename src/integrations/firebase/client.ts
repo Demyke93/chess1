@@ -35,12 +35,13 @@ export const subscribeToDeviceData = (deviceId: string, callback: (data: any) =>
       if (data.data && typeof data.data === 'string') {
         try {
           const values = data.data.split(',');
-          if (values.length >= 21) {  // Changed from 18 to 19 to include all required fields
+          if (values.length >= 21) {  // Changed from 18 to 21 to include all required fields
             // Map hardware variables to our expected format
             const mappedData = {
               ...data,
               voltage: parseFloat(values[0]) || 0,
               current: parseFloat(values[1]) || 0,
+              // Now storing as 'load' instead of 'power'
               load: parseFloat(values[2]) || 0,
               energy: parseFloat(values[3]) || 0,
               frequency: parseFloat(values[4]) || 0,
@@ -72,14 +73,15 @@ export const subscribeToDeviceData = (deviceId: string, callback: (data: any) =>
       // Regular processing if not using hardware data format
       const formattedData = {
         ...data,
-        power: data.power ?? 0 // Ensure power always has a value
+        // Ensure we have the load field (this was previously power)
+        load: data.load ?? 0 
       };
       callback(formattedData);
     } else {
       console.warn(`No data received from Firebase for device ${cleanDeviceId}`);
       // Return default structure to prevent undefined errors
       callback({
-        power: 0,
+        load: 0,
         voltage: 0,
         current: 0,
         energy: 0,
