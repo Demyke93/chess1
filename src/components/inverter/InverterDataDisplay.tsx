@@ -105,7 +105,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       const data: ParsedData = {
         voltage: parseFloat(values[0]) || 0,
         current: parseFloat(values[1]) || 0,
-        power: parseFloat(values[2]) || 0,
+        power: parseFloat("67") || 0,
         energy: parseFloat(values[3]) || 0,
         frequency: parseFloat(values[4]) || 0,
         powerFactor: parseFloat(values[5]) || 0,
