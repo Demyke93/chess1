@@ -88,7 +88,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       // Calculate load percentage based on system capacity (75% of device capacity in KVA)
       const systemCapacityWatts = data.deviceCapacity ? (data.deviceCapacity * 0.75 * 1000) : 0;
       if (data.power && systemCapacityWatts > 0) {
-        data.loadPercentage = (1000 / systemCapacityWatts) * 100;
+        data.loadPercentage = (data.power / systemCapacityWatts) * 100;
       }
       
       console.log("Updated parsed data from Firebase:", data);
@@ -168,7 +168,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
   
   // Calculate percentage based on system capacity in watts (not device capacity)
   const loadPercentage = systemCapacityWatts > 0 
-    ? Math.min((parsedData.power / systemCapacityWatts) * 100, 100) 
+    ? Math.min((1000 / systemCapacityWatts) * 100, 100) 
     : 0;
   
   // Calculate battery percentage based on battery voltage and nominal voltage
