@@ -124,43 +124,55 @@ export const PowerConsumptionChart = ({
     let batteryPercentage = 0;
     
     if (firebaseData) {
-      // FIXED: Get the actual power value from Firebase
-      // The device is ON (power = 1) and we have real_power data
+      // Check if the device is on and get the actual real power value from Firebase
+      // When power state is 1 (ON), we want to show the actual power consumption
       if (firebaseData.power === 1) {
-        // Parse real_power as a number to ensure it's treated as a number
-        realPower = parseFloat(firebaseData.real_power) || 
-                   parseFloat(firebaseData.power) || 
-                   currentPower || 0;
+        // Try to parse the real_power value from Firebase
+        const parsedRealPower = parseFloat(firebaseData.real_power);
+        if (!isNaN(parsedRealPower) && parsedRealPower > 0) {
+          realPower = parsedRealPower;
+        } else {
+          // Fallback to other power-related fields if real_power isn't available or valid
+          const parsedPower = parseFloat(firebaseData.power_output || firebaseData.output_power);
+          realPower = !isNaN(parsedPower) ? parsedPower : currentPower || 0;
+        }
       } else {
         // Device is OFF, no power consumption
         realPower = 0;
       }
       
       // Get energy from firebase data in kWh
-      energyKWh = parseFloat(firebaseData.energy || '0');
+      const parsedEnergy = parseFloat(firebaseData.energy || '0');
+      energyKWh = !isNaN(parsedEnergy) ? parsedEnergy : 0;
       
-      // FIXED: Get battery percentage directly from Firebase using parseFloat to ensure numeric value
-      batteryPercentage = parseFloat(firebaseData.battery_percentage || '0');
-      
-      // If no battery percentage but we have battery voltage and nominal voltage
-      if (!batteryPercentage && firebaseData.battery_voltage && firebaseData.nominal_voltage) {
-        batteryPercentage = Math.min(
-          Math.max(
-            (firebaseData.battery_voltage / firebaseData.nominal_voltage) * 100, 
-            0
-          ), 
-          100
-        );
+      // Get battery percentage directly from Firebase
+      const parsedBatteryPercentage = parseFloat(firebaseData.battery_percentage || '0');
+      if (!isNaN(parsedBatteryPercentage) && parsedBatteryPercentage > 0) {
+        batteryPercentage = parsedBatteryPercentage;
+      } 
+      // If no direct battery percentage but we have voltage values, calculate it
+      else if (firebaseData.battery_voltage && firebaseData.nominal_voltage) {
+        const batteryVoltage = parseFloat(firebaseData.battery_voltage);
+        const nominalVoltage = parseFloat(firebaseData.nominal_voltage);
+        if (!isNaN(batteryVoltage) && !isNaN(nominalVoltage) && nominalVoltage > 0) {
+          batteryPercentage = Math.min(
+            Math.max(
+              (batteryVoltage / nominalVoltage) * 100, 
+              0
+            ), 
+            100
+          );
+        }
       }
 
-      console.log("Firebase data for chart (FIXED):", {
+      console.log("Firebase data for chart:", {
         powerState: firebaseData.power,
         rawRealPower: firebaseData.real_power,
         parsedRealPower: parseFloat(firebaseData.real_power || '0'),
-        calculatedRealPower: realPower,
+        calculatedPower: realPower,
         batteryPercentage: batteryPercentage,
         energy: energyKWh,
-        rawFirebaseData: firebaseData
+        firebaseData
       });
     }
     
