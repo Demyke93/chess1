@@ -53,7 +53,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
         voltage: firebaseData.voltage || 0,
         current: firebaseData.current || 0,
         // Use real_power for power since they're the same
-        power: firebaseData.real_power || 0,
+        power: firebaseData.power || 0,
         energy: firebaseData.energy || 0,
         frequency: firebaseData.frequency || 0,
         powerFactor: firebaseData.power_factor || 0,
@@ -68,7 +68,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
         currentPeakPeak: firebaseData.current_peak_peak || 0,
         // Use calculated battery percentage based on voltage and nominal voltage
         batteryPercentage: 0, // Will be calculated below
-        loadPercentage: 0, // Will be calculated below
+        loadPercentage: firebaseData.load_percentage, // Let's use the firebase value
         analogReading: firebaseData.analog_reading || 0, //should be ignored
         surgeResult: firebaseData.surge_result || "", //should be ignored
         powerControl: firebaseData.power_control || 0, //should be ignored
@@ -87,7 +87,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       // Calculate load percentage based on system capacity (75% of device capacity in KVA)
       const systemCapacityWatts = data.deviceCapacity ? (data.deviceCapacity * 0.75 * 1000) : 0;
       if (data.power && systemCapacityWatts > 0) {
-        data.loadPercentage = (data.power / systemCapacityWatts) * 100;
+        data.loadPercentage = loadPercentage;
       }
       
       console.log("Updated parsed data from Firebase:", data);
@@ -120,7 +120,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
         voltagePeakPeak: parseFloat(values[13]) || 0,
         currentPeakPeak: parseFloat(values[14]) || 0,
         batteryPercentage: 0, // Will be calculated below
-        loadPercentage: 0, // Will be calculated below
+        loadPercentage: firebaseData.load_percentage, // Let's use the firebase value
         analogReading: parseFloat(values[17]) || 0,
         surgeResult: values[18] || "",
         powerControl: parseInt(values[19]) || 0,
@@ -139,7 +139,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       // Recalculate load percentage based on system capacity (75% of device capacity in KVA)
       const systemCapacityWatts = data.deviceCapacity ? (data.deviceCapacity * 0.75 * 1000) : 0;
       if (data.power && systemCapacityWatts > 0) {
-        data.loadPercentage = (data.power / systemCapacityWatts) * 100;
+        data.loadPercentage = loadPercentage;
       }
       
       setParsedData(data);
