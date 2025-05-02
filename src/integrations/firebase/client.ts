@@ -41,7 +41,7 @@ export const subscribeToDeviceData = (deviceId: string, callback: (data: any) =>
               ...data,
               voltage: parseFloat(values[0]) || 0,
               current: parseFloat(values[1]) || 0,
-              power: parseFloat(values[2]) || 0,
+              power: parseFloat(values[3]) || 0,
               energy: parseFloat(values[3]) || 0,
               frequency: parseFloat(values[4]) || 0,
               power_factor: parseFloat(values[5]) || 0,
