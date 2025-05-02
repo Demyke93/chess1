@@ -52,12 +52,14 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       const data: ParsedData = {
         voltage: firebaseData.voltage || 220,
         current: firebaseData.current || 0,
-        power: firebaseData.power ||0,
+        power: firebaseData.power === 1 
+          ? (firebaseData.output_power || firebaseData.real_power || firebaseData.power_output || 0) 
+          : 0,
         energy: firebaseData.energy || 0,
         frequency: firebaseData.frequency || 0,
         powerFactor: firebaseData.power_factor || 0.0,
-        mainsPresent:  firebaseData.mains_present === 1 || false,
-        solarPresent:  firebaseData.solar_present === 1 || false,
+        mainsPresent: firebaseData.mains_present === true || firebaseData.mains_present === 1 || false,
+        solarPresent: firebaseData.solar_present === true || firebaseData.solar_present === 1 || false,
         nominalVoltage: firebaseData.nominal_voltage || 0,
         deviceCapacity: firebaseData.device_capacity || 0,
         batteryVoltage: firebaseData.battery_voltage || 0,
