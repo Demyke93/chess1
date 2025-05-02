@@ -52,9 +52,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       const data: ParsedData = {
         voltage: firebaseData.voltage || 220,
         current: firebaseData.current || 0,
-        power: firebaseData.power === 1 
-          ? (firebaseData.output_power || firebaseData.real_power || firebaseData.power_output || 0) 
-          : 0,
+        power: firebaseData.power || 0,
         energy: firebaseData.energy || 0,
         frequency: firebaseData.frequency || 0,
         powerFactor: firebaseData.power_factor || 0.0,
