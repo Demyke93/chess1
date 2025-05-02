@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeviceStatusMonitor } from "./DeviceStatusMonitor";
@@ -52,7 +51,8 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       const data: ParsedData = {
         voltage: firebaseData.voltage || 0,
         current: firebaseData.current || 0,
-        power: firebaseData.power || 0,
+        // Use real_power for power since they're the same
+        power: firebaseData.real_power || 0,
         energy: firebaseData.energy || 0,
         frequency: firebaseData.frequency || 0,
         powerFactor: firebaseData.power_factor || 0,

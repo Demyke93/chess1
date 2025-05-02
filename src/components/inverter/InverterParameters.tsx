@@ -1,6 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Battery, Gauge, Power, Zap, AlertTriangle } from "lucide-react";
+
 interface ParameterProps {
   data: {
     battery_percentage?: number;
@@ -25,6 +26,7 @@ interface ParameterProps {
   showAdvanced: boolean;
   deviceCapacity: number; // Device capacity from Firebase in KVA
 }
+
 export const InverterParameters = ({
   data,
   showAdvanced,
@@ -36,15 +38,14 @@ export const InverterParameters = ({
   // Convert system capacity to Watts for comparison with output_power
   const systemCapacityWatts = systemCapacity * 1000;
 
-  // FIXED: Get the actual power from data
-  // Only use non-zero power values to correctly calculate load
-  const currentPower = parseFloat(data.real_power?.toString() || data.output_power?.toString() || '0');
+  // Use real_power as the primary power value since real_power = power = current_power
+  const currentPower = data.real_power || data.output_power || 0;
 
-  console.log("InverterParameters power data (FIXED):", {
-    realPower: data.real_power,//the powers are the same
-    outputPower: data.real_power,//the powers are the same
-    currentPower: data.real_power,//the powers are the same
-    systemCapacityWatts: systemCapacityWatts
+  console.log("InverterParameters power data:", {
+    realPower: data.real_power,
+    outputPower: data.output_power,
+    currentPower,
+    systemCapacityWatts
   });
 
   // Set the surge threshold at 80% of system capacity
