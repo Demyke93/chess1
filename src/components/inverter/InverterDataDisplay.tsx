@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeviceStatusMonitor } from "./DeviceStatusMonitor";
@@ -47,49 +48,40 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
   useEffect(() => {
     // Priority to Firebase data if available
     if (firebaseData) {
-      // Parse all numeric values to ensure they're treated as numbers
-      const parseNumeric = (value: any) => {
-        if (value === undefined || value === null) return 0;
-        const parsed = parseFloat(value);
-        return isNaN(parsed) ? 0 : parsed;
-      };
-
-      // Check if device is powered on - power value should be 1 for ON
-      const isPoweredOn = firebaseData.power === 1;
-      
       // Map Firebase data to our data format
       const data: ParsedData = {
-        voltage: parseNumeric(firebaseData.voltage) || 220,
-        current: parseNumeric(firebaseData.current) || 0,
-        // Only show power consumption if device is powered ON
-        power: isPoweredOn ? parseNumeric(firebaseData.real_power) || parseNumeric(firebaseData.power_output) || parseNumeric(firebaseData.output_power) || 0 : 0,
-        energy: parseNumeric(firebaseData.energy) || 0,
-        frequency: parseNumeric(firebaseData.frequency) || 50,
-        powerFactor: parseNumeric(firebaseData.power_factor) || 0.9,
+        voltage: firebaseData.voltage || 220,
+        current: firebaseData.current || 0,
+        power: firebaseData.power === 1 
+          ? (firebaseData.output_power || firebaseData.real_power || firebaseData.power_output || 0) 
+          : 0,
+        energy: firebaseData.energy || 0,
+        frequency: firebaseData.frequency || 50,
+        powerFactor: firebaseData.power_factor || 0.9,
         mainsPresent: firebaseData.mains_present === true || firebaseData.mains_present === 1 || false,
         solarPresent: firebaseData.solar_present === true || firebaseData.solar_present === 1 || false,
-        nominalVoltage: parseNumeric(firebaseData.nominal_voltage) || 24,
-        deviceCapacity: parseNumeric(firebaseData.device_capacity) || 5,
-        batteryVoltage: parseNumeric(firebaseData.battery_voltage) || 24,
-        apparentPower: parseNumeric(firebaseData.apparent_power) || 0,
-        reactivePower: parseNumeric(firebaseData.reactive_power) || 0,
-        voltagePeakPeak: parseNumeric(firebaseData.voltage_peak_peak) || 310,
-        currentPeakPeak: parseNumeric(firebaseData.current_peak_peak) || 0,
-        // Try to get battery percentage directly or calculate it
-        batteryPercentage: parseNumeric(firebaseData.battery_percentage) || 0,
+        nominalVoltage: firebaseData.nominal_voltage || 24,
+        deviceCapacity: firebaseData.device_capacity || 5,
+        batteryVoltage: firebaseData.battery_voltage || 24,
+        apparentPower: firebaseData.apparent_power || 0,
+        reactivePower: firebaseData.reactive_power || 0,
+        voltagePeakPeak: firebaseData.voltage_peak_peak || 310,
+        currentPeakPeak: firebaseData.current_peak_peak || 0,
+        // Use calculated battery percentage based on voltage and nominal voltage
+        batteryPercentage: 0, // Will be calculated below
         loadPercentage: 0, // Will be calculated below
-        analogReading: parseNumeric(firebaseData.analog_reading) || 0,
+        analogReading: firebaseData.analog_reading || 0,
         surgeResult: firebaseData.surge_result || "",
-        powerControl: parseInt(firebaseData.power_control) || 0,
-        randomValue: parseInt(firebaseData.random_value) || 0,
+        powerControl: firebaseData.power_control || 0,
+        randomValue: firebaseData.random_value || 0,
         // Use the inverterState from the hook which gets data from "_" prefixed path
         inverterState: inverterState,
         lastUserPower: firebaseData.lastUserPower,
         lastUserEnergy: firebaseData.lastUserEnergy
       };
       
-      // Calculate battery percentage if not already set and we have battery voltage
-      if (!data.batteryPercentage && data.batteryVoltage && data.nominalVoltage && data.nominalVoltage > 0) {
+      // Calculate battery percentage based on voltage and nominal voltage
+      if (data.batteryVoltage && data.nominalVoltage && data.nominalVoltage > 0) {
         data.batteryPercentage = Math.min(Math.max((data.batteryVoltage / data.nominalVoltage) * 100, 0), 100);
       }
       
@@ -216,7 +208,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
           </CardContent>
         </Card>
 
-        {/* Power Output Card */}
+        {/* Power Output Card - UPDATED to match Output Parameters card from InverterParameters.tsx */}
         <Card className={`bg-black/40 ${isSurgeCondition ? 'border-red-500/50' : 'border-orange-500/20'}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-white">Power Output</CardTitle>

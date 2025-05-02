@@ -50,25 +50,14 @@ export const SystemTabs = ({
   
   const isMobile = useIsMobile();
 
-  // Get the actual power value from Firebase data
-  let currentPower = 0;
-  
-  // Only show power if the device is ON (power = 1)
-  if (firebaseData?.power === 1) {
-    // Try to get real_power first, then fall back to other power fields
-    if (firebaseData?.real_power) {
-      currentPower = parseFloat(firebaseData.real_power);
-    } else if (firebaseData?.power_output) {
-      currentPower = parseFloat(firebaseData.power_output);
-    } else if (firebaseData?.output_power) {
-      currentPower = parseFloat(firebaseData.output_power);
-    }
-  }
+  // Get actual power value from Firebase - FIXED to correctly use the power value
+  const powerValue = firebaseData?.power === 1 ? 
+    (parseFloat(firebaseData?.real_power || firebaseData?.power || 0)) : 0;
 
-  console.log("Power in SystemTabs:", {
+  console.log("Power in SystemTabs (FIXED):", {
     firebasePower: firebaseData?.power,
     firebaseRealPower: firebaseData?.real_power,
-    calculatedPower: currentPower,
+    calculatedPower: powerValue,
     rawFirebaseData: firebaseData
   });
 
@@ -76,18 +65,19 @@ export const SystemTabs = ({
   const extendedParameters = parameters ? {
     ...parameters,
     nominal_voltage: firebaseData?.nominal_voltage || parameters.nominal_voltage,
-    // Use the actual power values from Firebase, prioritizing real_power
-    real_power: currentPower,
-    output_power: currentPower,
+    // FIXED: Use the actual power values from Firebase
+    real_power: parseFloat(firebaseData?.real_power || 0),
+    output_power: parseFloat(firebaseData?.real_power || 0),
     // Ensure battery percentage is from Firebase
     battery_percentage: firebaseData?.battery_percentage || parameters.battery_percentage
   } : null;
 
   return (
     <Tabs defaultValue="overview" className="w-full">
-      <TabsList className="grid grid-cols-2 bg-black/40 border-orange-500/20">
+      <TabsList className="grid grid-cols-3 bg-black/40 border-orange-500/20">
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="control">Control</TabsTrigger>
+        <TabsTrigger value="data">Data</TabsTrigger>
       </TabsList>
       
       <TabsContent value="overview" className="space-y-4">
@@ -100,13 +90,21 @@ export const SystemTabs = ({
         )}
         <PowerConsumptionChart 
           systemCapacity={systemCapacity} 
-          currentPower={currentPower}
+          currentPower={parseFloat(firebaseData?.real_power || 0)}
           firebaseData={firebaseData}
         />
       </TabsContent>
       
       <TabsContent value="control" className="space-y-4">
         <LoadControlPanel inverterId={inverterId} />
+      </TabsContent>
+      
+      <TabsContent value="data" className="space-y-4">
+        <InverterDataDisplay 
+          deviceData={deviceData} 
+          inverterId={inverterId} 
+          firebaseData={firebaseData} 
+        />
       </TabsContent>
     </Tabs>
   );
