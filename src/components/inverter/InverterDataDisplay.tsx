@@ -56,16 +56,16 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
           ? (firebaseData.output_power || firebaseData.real_power || firebaseData.power_output || 0) 
           : 0,
         energy: firebaseData.energy || 0,
-        frequency: firebaseData.frequency || 50,
-        powerFactor: firebaseData.power_factor || 0.9,
+        frequency: firebaseData.frequency || 0,
+        powerFactor: firebaseData.power_factor || 0.0,
         mainsPresent: firebaseData.mains_present === true || firebaseData.mains_present === 1 || false,
         solarPresent: firebaseData.solar_present === true || firebaseData.solar_present === 1 || false,
-        nominalVoltage: firebaseData.nominal_voltage || 24,
-        deviceCapacity: firebaseData.device_capacity || 5,
-        batteryVoltage: firebaseData.battery_voltage || 24,
+        nominalVoltage: firebaseData.nominal_voltage || 0,
+        deviceCapacity: firebaseData.device_capacity || 0,
+        batteryVoltage: firebaseData.battery_voltage || 0,
         apparentPower: firebaseData.apparent_power || 0,
         reactivePower: firebaseData.reactive_power || 0,
-        voltagePeakPeak: firebaseData.voltage_peak_peak || 310,
+        voltagePeakPeak: firebaseData.voltage_peak_peak || 0,
         currentPeakPeak: firebaseData.current_peak_peak || 0,
         // Use calculated battery percentage based on voltage and nominal voltage
         batteryPercentage: 0, // Will be calculated below
@@ -81,14 +81,14 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
       };
       
       // Calculate battery percentage based on voltage and nominal voltage
-      if (data.batteryVoltage && data.nominalVoltage && data.nominalVoltage > 0) {
+      if (data.batteryVoltage && data.nominalVoltage > 0) {
         data.batteryPercentage = Math.min(Math.max((data.batteryVoltage / data.nominalVoltage) * 100, 0), 100);
       }
       
       // Calculate load percentage based on system capacity (75% of device capacity in KVA)
-      const systemCapacityWatts = data.deviceCapacity ? (data.deviceCapacity * 0.75 * 1000) : 3000;
+      const systemCapacityWatts = data.deviceCapacity ? (data.deviceCapacity * 0.75 * 1000) : 0;
       if (data.power && systemCapacityWatts > 0) {
-        data.loadPercentage = (data.power / systemCapacityWatts) * 100;
+        data.loadPercentage = (1000 / systemCapacityWatts) * 100;
       }
       
       console.log("Updated parsed data from Firebase:", data);
@@ -113,8 +113,8 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
         powerFactor: parseFloat(values[5]) || 0,
         mainsPresent: values[6] === "1",
         solarPresent: values[7] === "1",
-        nominalVoltage: parseFloat(values[8]) || 24,
-        deviceCapacity: parseFloat(values[9]) || 5,
+        nominalVoltage: parseFloat(values[8]) || 0,
+        deviceCapacity: parseFloat(values[9]) || 0,
         batteryVoltage: parseFloat(values[10]) || 0,
         apparentPower: parseFloat(values[11]) || 0,
         reactivePower: parseFloat(values[12]) || 0,
