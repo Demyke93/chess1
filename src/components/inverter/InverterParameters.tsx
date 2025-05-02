@@ -25,16 +25,12 @@ interface ParameterProps {
   };
   showAdvanced: boolean;
   deviceCapacity: number; // Device capacity from Firebase in KVA
-  power: number;
-  load_percentage: number;
 }
 
 export const InverterParameters = ({
   data,
   showAdvanced,
-  deviceCapacity,
-  power,
-  load_percentage
+  deviceCapacity
 }: ParameterProps) => {
   // Calculate system capacity as 75% of device capacity (KVA to KW)
   const systemCapacity = deviceCapacity ? Math.round(deviceCapacity * 0.75 * 100) / 100 : 0;
@@ -46,14 +42,19 @@ export const InverterParameters = ({
   const currentPower = data.real_power || data.output_power || 0;
 
   console.log("InverterParameters power data:", {
-    realPower: power,
-    outputPower: power,
-    currentPower: power,
+    realPower: data.real_power,
+    outputPower: data.output_power,
+    currentPower,
     systemCapacityWatts
   });
 
   // Set the surge threshold at 80% of system capacity
   const isPowerSurge = systemCapacityWatts ? currentPower / systemCapacityWatts > 0.8 : false;
+
+  // Calculate load percentage based on actual power consumption and system capacity
+  const loadPercentage = systemCapacityWatts 
+    ? Math.min(Math.round((currentPower / systemCapacityWatts) * 100), 100) 
+    : 0;
 
   // Calculate battery percentage based on battery voltage and nominal voltage if not directly available
   const calculatedBatteryPercentage = data.battery_percentage || 
@@ -92,14 +93,14 @@ export const InverterParameters = ({
             <div className="relative w-full h-2 bg-gray-700 rounded-full overflow-hidden">
               <div 
                 className={`absolute top-0 left-0 h-full rounded-full ${
-                  load_percentage > 80 ? 'bg-red-500' : 
-                  load_percentage > 60 ? 'bg-yellow-500' : 'bg-green-500'
+                  loadPercentage > 80 ? 'bg-red-500' : 
+                  loadPercentage > 60 ? 'bg-yellow-500' : 'bg-green-500'
                 }`} 
-                style={{ width: `${load_percentage}%` }}
+                style={{ width: `${loadPercentage}%` }}
               />
             </div>
             <p className="text-xs text-gray-300">
-              Capacity: {deviceCapacity ?? 'N/A'} KVA ({systemCapacity} KW) | Load: {load_percentage}%
+              Capacity: {deviceCapacity ?? 'N/A'} KVA ({systemCapacity} KW) | Load: {loadPercentage}%
             </p>
             <p className="text-xs text-gray-300">
               Voltage: {data.output_voltage?.toFixed(1) ?? 'N/A'}V
@@ -132,7 +133,7 @@ export const InverterParameters = ({
             <CardContent>
               <div className="space-y-2">
                 <p className="text-xs text-gray-300">Apparent: {data.apparent_power?.toFixed(1) ?? 'N/A'}VA</p>
-                <p className="text-xs text-gray-300">Real: {power?.toFixed(1) ?? 'N/A'}W</p>
+                <p className="text-xs text-gray-300">Real: {data.real_power?.toFixed(1) ?? 'N/A'}W</p>
                 <p className="text-xs text-gray-300">Reactive: {data.reactive_power?.toFixed(1) ?? 'N/A'}VAR</p>
               </div>
             </CardContent>
