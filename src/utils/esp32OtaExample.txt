@@ -1,36 +1,175 @@
-/*
- * Complete ESP32/ESP8266 OTA Update Example for PowerVerter Pro
- * This code demonstrates how to integrate OTA updates with Firebase
- */
-
+#include <WiFi.h>
 #include <Firebase_ESP_Client.h>
 #include <ArduinoJson.h>
-#include <WiFiManager.h>
 #include <WiFiClientSecure.h>
 #include <HTTPUpdate.h>
-
-// Pin definitions for load control
+#include <TimeLib.h>
+#include <SoftwareSerial.h>
+#include <PZEM004Tv30.h>
+#include <WiFiManager.h> 
+#include "SPIFFS.h"
+#define TIME_WINDOW 5000     // Time window in milliseconds (5 seconds) for low battery sensing
+#define SIGNAL_PIN 39
+const char* CAL = "/CAL.txt";
+const char* VOLT = "/VOLT.txt";
+const char* CAP = "/CAP.txt";
+const char* MAIL = "/MAIL.txt";
+const char* APPLINK = "/APPLINK.txt";
 const int load1 = 12;
 const int load2 = 14;
 const int load3 = 27;
 const int load4 = 26;
 const int load5 = 25;
 const int load6 = 33;
-const int load7 = 32;
+int abnormalCondition = 0;
 
-// WiFi Manager configuration
+volatile int signalCount = 0;         // Counter for signal detections
+unsigned long firstSignalTime = 0;    // Timestamp of the first detected signal
+volatile bool timerExpired = false;  // Flag to check if the time window has expired
+
+void writeString(char add, String data);
+String read_String(char add);
 bool wm_nonblocking = false;
-WiFiManager wm;
+float load, energy;
+int mainState, tmp;
+#define led 23
+#define mainSense 32 // instead of pin15
+#define TRIGGER_PIN 22
+#define powerState 21
+#define inverterSwitch 4
 
-// Load variables
-int load_1, load_2, load_3, load_4, load_5, load_6, load_7, load_8;
+float calibration = 1.0;
+WiFiManager wm; 
+int solarSense;
+char *deviceCapacity;
+char *nominalVoltage;
+char *App_link;
+String nominal,capacity;
 
-// Firebase includes
+void IRAM_ATTR handleSignal() {
+  static unsigned long lastInterruptTime = 0; // For debouncing
+  unsigned long interruptTime = millis();
+
+  if (interruptTime - lastInterruptTime > 50) { // Debounce check (50ms)
+    if (signalCount == 0) {
+      firstSignalTime = interruptTime; // Record the first signal detection time
+    }
+    signalCount++;
+  }
+  lastInterruptTime = interruptTime;
+}
+
+void initSPIFFS() {
+  if (!SPIFFS.begin(true)) {
+    // Serial.println("An error has occurred while mounting SPIFFS");
+  }
+  Serial.println("SPIFFS mounted successfully");
+}
+
+
+// Read File from SPIFFS
+String readFile(fs::FS &fs, const char * path){
+  // Serial.printf("Reading file: %s\r\n", path);
+
+  File file = fs.open(path);
+  if(!file || file.isDirectory()){
+    // Serial.println("- failed to open file for reading");
+    return String();
+  }
+
+  String fileContent;
+  while(file.available()){
+    fileContent = file.readStringUntil('\n');
+    break;     
+  }
+  return fileContent;
+}
+
+// Write file to SPIFFS
+void writeFile(fs::FS &fs, const char * path, const char * message){
+  Serial.printf("Writing file: %s\r\n", path);
+
+  File file = fs.open(path, FILE_WRITE);
+  if(!file){
+    // Serial.println("- failed to open file for writing");
+    return;
+  }
+  if(file.print(message)){
+    // Serial.println("- file written");
+  } else {
+    // Serial.println("- frite failed");
+  }
+}
+
+  WiFiManagerParameter custom_text("<p>Register Device</p>");
+  WiFiManagerParameter custom_nominalVoltage("nominalVoltage","Nominal Voltage(V)" ,nominalVoltage, 4);
+  WiFiManagerParameter custom_deviceCapacity("deviceCapacity","Device Capacity(KVA)",deviceCapacity,4);
+  WiFiManagerParameter custom_applink("App_link","App link" ,App_link, 150);
+
+void saveParamCallback(){  
+  // Serial.println("[CALLBACK] saveParamCallback fired");
+    if(String(custom_nominalVoltage.getValue()).length() > 0)
+  {
+    writeFile(SPIFFS, VOLT, custom_nominalVoltage.getValue());
+  //writeString(1,String(custom_nominalVoltage.getValue()));
+  }
+    if(String(custom_deviceCapacity.getValue()).length() > 0)
+  {
+    writeFile(SPIFFS, CAP, custom_deviceCapacity.getValue());
+  //writeString(5,String(custom_deviceCapacity.getValue()));
+  }
+  if(String(custom_applink.getValue()).length() > 7)
+  {
+    writeFile(SPIFFS, APPLINK, custom_applink.getValue());
+    //writeString(100,String(custom_applink.getValue()));
+  }
+  
+  Serial.println("applink:"+String(custom_applink.getValue()));
+
+}
+
+String getParam(String name){
+  //read parameter from server, for customhmtl input
+  String value;
+  if(wm.server->hasArg(name)) {
+    value = wm.server->arg(name);
+  }
+  return value;
+}
+
+#if !defined(PZEM_RX_PIN) && !defined(PZEM_TX_PIN)
+#define PZEM_RX_PIN 16
+#define PZEM_TX_PIN 17
+#endif
+
+#if !defined(PZEM_SERIAL)
+#define PZEM_SERIAL Serial2
+#endif
+
+
+#if defined(ESP32)
+
+PZEM004Tv30 pzem(PZEM_SERIAL, PZEM_RX_PIN, PZEM_TX_PIN);
+#elif defined(ESP8266)
+
+#else
+
+PZEM004Tv30 pzem(PZEM_SERIAL);
+#endif
+
+// Provide the token generation process info.
 #include "addons/TokenHelper.h"
+// Provide the RTDB payload printing info and other helper functions.
 #include "addons/RTDBHelper.h"
 
-// Firebase configuration
+// Insert your network credentials
+// #define WIFI_SSID "Delight"
+// #define WIFI_PASSWORD "olaoluwa"
+
+// Insert Firebase project API Key
 #define API_KEY "AIzaSyCaJJ-2ExS5uGcH7jQ_9jwbHFIKLrj8J54"
+
+// Insert RTDB URLefine the RTDB URL
 #define DATABASE_URL "https://powerverter-pro-default-rtdb.firebaseio.com/"
 
 // Define Firebase objects
@@ -41,19 +180,13 @@ FirebaseConfig config;
 // Variable to save USER UID
 String uid;
 
-FirebaseJson json;
+// Database child nodes
 
-// IMPORTANT: Change these paths to match your device ID
-// Note: the device path uses a DOUBLE underscore prefix for OTA updates
-String appPath = "/_3415fysgfy514514e5";
-String devicePath = "/3415fysgfy514514e5";
-String otaPath = "/__3415fysgfy514514e5"; // NEW: Path for OTA updates with double underscore
+// Parent Node (to be updated in every loop)
+String devicePath,appPath, otaPath;
 
-// Timer variables
-unsigned long sendDataPrevMillis = 0, sendDataPrevMillis_2 = 0, lastOTACheck = 0;
-unsigned long timerDelay = 10, timerDelay_2 = 100;
-
-JsonDocument doc;
+int timestamp;
+FirebaseJson json, jsonn;
 
 // Update progress callback for better monitoring
 void updateCallback(size_t progress, size_t total) {
@@ -148,7 +281,7 @@ void checkForOTAUpdates() {
         client.setTimeout(60); // Increase timeout to 60 seconds
         
         // Configure HTTP update with callback
-        httpUpdate.setLedPin(LED_BUILTIN, LOW);
+        // httpUpdate.setLedPin(LED_BUILTIN, LOW);
         httpUpdate.onProgress(updateCallback);
         
         // Pre-check the URL with HEAD request to verify it has Content-Length header
@@ -240,15 +373,51 @@ void checkForOTAUpdates() {
   }
 }
 
-void saveParamCallback(){  
-  Serial.println("[CALLBACK] saveParamCallback fired");
-}
+bool inverter_state;
+// BME280 sensor
+// Adafruit_BME280 bme; // I2C
+float temperature;
+float humidity;
+float pressure;
+int STATE=HIGH, powerStatus = 0, sol;
+// Timer variables (send new readings every three minutes)
+unsigned long sendDataPrevMillis = 0, sendDataPrevMillis_2 = 0, lastOTACheck = 0;
+unsigned long timerDelay = 10, timerDelay_2 = 100;
+
+int energy_control, power_control, load_1,load_2,load_3,load_4,load_5,load_6, temp = 0;
+const char *lastUserPower, *lastUserEnergy;
+
+JsonDocument doc;
 
 void setup(){
   Serial.begin(115200);
   Serial.println("PowerVerter Pro - Starting up");
-
-  // Setup WiFiManager
+  initSPIFFS();
+	// How often should we synchronise the time on this machine (in seconds)?
+	// Use 300 for 5 minutes but once an hour (3600) is more than enough usually
+  pinMode(TRIGGER_PIN, INPUT_PULLUP);
+  pinMode(led,OUTPUT);
+  pinMode(load1,OUTPUT);
+  pinMode(load2,OUTPUT);
+  pinMode(load3,OUTPUT);
+  pinMode(load4,OUTPUT);
+  pinMode(load5,OUTPUT);
+  pinMode(load6,OUTPUT);
+  pinMode(powerState,INPUT);
+  pinMode(inverterSwitch,OUTPUT);
+  pinMode(SIGNAL_PIN, INPUT);
+  digitalWrite(inverterSwitch,LOW);
+  digitalWrite(load1,HIGH);
+  digitalWrite(load2,HIGH);
+  digitalWrite(load3,HIGH);
+  digitalWrite(load4,HIGH);
+  digitalWrite(load5,HIGH);
+  digitalWrite(load6,HIGH);
+  attachInterrupt(digitalPinToInterrupt(SIGNAL_PIN), handleSignal, FALLING); // Trigger on FALLING edge
+  wm.addParameter(&custom_text);
+  wm.addParameter(&custom_nominalVoltage);
+  wm.addParameter(&custom_deviceCapacity);
+  wm.addParameter(&custom_applink);
   if(wm_nonblocking) wm.setConfigPortalBlocking(false);
   wm.setSaveParamsCallback(saveParamCallback);
   std::vector<const char *> menu = {"wifi","info","param","sep","restart","exit"};
@@ -261,65 +430,70 @@ void setup(){
   wm.setConnectTimeout(5);
   wm.setConnectRetries(3);
   
-  // Connect to WiFi
+  pinMode(powerState,INPUT);
+  pinMode(inverterSwitch,OUTPUT);
+  digitalWrite(inverterSwitch,LOW);
   bool res;
   res = wm.autoConnect("PVT DEVICE",""); 
+
   if(!res) {
     Serial.println("Failed to connect or hit timeout");
     // ESP.restart();
   } 
   else {  
-    Serial.println("PVT Connected successfully");
+    Serial.println("device connected:)");
   }
-  
-  // Configure output pins
-  pinMode(load1, OUTPUT);
-  pinMode(load2, OUTPUT);
-  pinMode(load3, OUTPUT);
-  pinMode(load4, OUTPUT);
-  pinMode(load5, OUTPUT);
-  pinMode(load6, OUTPUT);
-  pinMode(load7, OUTPUT);
+  //nominal = read_String(1);
+  //capacity = read_String(5);
+  //email = read_String(10);
+  //Web_App_URL = read_String(100);
+  nominal = readFile(SPIFFS, VOLT);
+  capacity = readFile(SPIFFS, CAP);
+  devicePath = readFile(SPIFFS, APPLINK);
+  appPath = "/_" + devicePath;
+  otaPath = "/__" + devicePath;
+  devicePath = "/" + devicePath;
+  Serial.print("devicePath : ");
+  Serial.println(devicePath);
 
-  // Default to all loads off
-  digitalWrite(load1, HIGH);
-  digitalWrite(load2, HIGH);
-  digitalWrite(load3, HIGH);
-  digitalWrite(load4, HIGH);
-  digitalWrite(load5, HIGH);
-  digitalWrite(load6, HIGH);
-  digitalWrite(load7, HIGH);
-
-  // Configure Firebase
+  // Assign the api key (required)
   config.api_key = API_KEY;
-  auth.user.email = "your-email@example.com"; // Replace with your email
-  auth.user.password = "your-password";        // Replace with your password
+
+  // Assign the user sign in credentials
+  auth.user.email = "abogunrinayodeji@gmail.com";
+  auth.user.password = "Olaoluwa993#";
+
+  // Assign the RTDB URL (required)
   config.database_url = DATABASE_URL;
 
   Firebase.reconnectWiFi(true);
   fbdo.setResponseSize(4096);
-  config.token_status_callback = tokenStatusCallback;
-  config.max_token_generation_retry = 3;
 
-  // Initialize Firebase
+  // Assign the callback function for the long running token generation task */
+  config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
+
+  // Assign the maximum retry of token generation
+  config.max_token_generation_retry = 2;
+
+  // Initialize the library with the Firebase authen and config
   Firebase.begin(&config, &auth);
 
-  // Getting the user UID
+  // Getting the user UID might take a few seconds
   Serial.println("Getting User UID");
   while ((auth.token.uid) == "") {
     Serial.print('.');
     delay(1000);
   }
-  
+  // Print user UID
   uid = auth.token.uid.c_str();
   Serial.print("User UID: ");
   Serial.println(uid);
-  
-  // Send initial status
+
+    // Send initial status
   FirebaseJson statusJson;
   statusJson.set("status", "online");
   statusJson.set("message", "Device started successfully");
-  statusJson.set("version", "1.0.0");
+  statusJson.set("version", "latest");
   Firebase.RTDB.setJSON(&fbdo, devicePath + "/status", &statusJson);
   
   // Check for OTA updates on startup
@@ -327,69 +501,309 @@ void setup(){
 }
 
 void loop(){
-  // WiFi manager process if non-blocking
-  if(wm_nonblocking) wm.process();
-
-  // Check if WiFi is connected
-  if(WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi disconnected, attempting to reconnect");
-    WiFi.reconnect();
-    delay(1000);
-  }
-  
-  // Send sensor data to Firebase
-  if (Firebase.ready() && (millis() - sendDataPrevMillis > timerDelay || sendDataPrevMillis == 0)){
-    sendDataPrevMillis = millis();
-    
-    Serial.println("Sending to cloud..");
-    // Generate sensor data
-    String values = String(random(208,230))+","+String(random(10,20))+","+String(random(2000,4000))+","+String(random(1,10))+","+String(random(47,50));
-    values = values +","+"0.6"+","+"1"+","+"1"+","+"24"+","+"5"+","+String(random(20,25))+","+String(random(22,25))+","+String(random(22,25))+","+String(random(22,25))+","+String(random(2,10))+","+ String(random(60,90))+","+String(random(40,70))+","+"0"+","+"0"+","+"0"+ ","+ String(random (0,100000)) + "," + "0";
-    
-    // Send data
-    json.set("data", values);
-    Serial.printf("Set json... %s\n", Firebase.RTDB.setJSON(&fbdo, devicePath.c_str(), &json) ? "ok" : fbdo.errorReason().c_str());
+  if(wm_nonblocking) wm.process(); // avoid delays() in loop when non-blocking and other long running code  
+   unsigned long currentTime = millis();
+  // Check if three signals occurred within the time window
+  if (signalCount >= 3 && !timerExpired) {
+    if (currentTime - firstSignalTime <= TIME_WINDOW) {
+      Serial.println("frequent states detected, Too Frequent Switching!");
+      Serial.printf("Set jsonn... %s\n", Firebase.RTDB.setJSON(&fbdo, appPath.c_str(), &jsonn) ? "ok" : fbdo.errorReason().c_str());
+        jsonn.set("power", "0");
+        jsonn.set("lastUserPower", "Too Frequent Switching");
+        //pulse();
+    }
+    signalCount = 0;  // Reset the counter after action
+    firstSignalTime = 0; // Reset the timestamp
+    timerExpired = true; // Mark the timer as expired to prevent repeated blinking
   }
 
-  // Read control commands from Firebase
-  if (millis() - sendDataPrevMillis_2 > timerDelay_2 || sendDataPrevMillis_2 == 0){
-    sendDataPrevMillis_2 = millis();
+  // Reset the counter if the time window has passed
+  if (currentTime - firstSignalTime > TIME_WINDOW && signalCount > 0) {
+    Serial.println("Time window expired, resetting counter");
+    signalCount = 0;
+    firstSignalTime = 0;
+    timerExpired = false; // Reset the timer expired flag
+  }
+    checkButton();
 
-    String appData;
-    FirebaseJson jVal;
-    Firebase.RTDB.getJSON(&fbdo, appPath, &jVal);
-    appData = jVal.raw();
-    Serial.println(appData);
-    DeserializationError error = deserializeJson(doc, appData);
-
-    // Check if parsing succeeds
-    if (error) {
-      Serial.print(F("deserializeJson() failed: "));
-      Serial.println(error.f_str());
-      return;
+    Serial.print("Solar sense: ");
+    Serial.println(analogRead(35));
+    if(analogRead(35) > sol)
+    {
+      solarSense=1;
+    }
+    else
+    {
+      solarSense=0;
     }
 
-    // Get control values
-    load_1 = doc["load_1"];
-    load_2 = doc["load_2"];
-    load_3 = doc["load_3"];
-    load_4 = doc["load_4"];
-    load_5 = doc["load_5"];
-    load_6 = doc["load_6"];
-    load_7 = doc["load_7"];
+    float voltage = pzem.voltage();
+    float current = pzem.current();
+    load = pzem.power(); 
+    if(isnan(pzem.energy()))
+   {
+      energy = pzem.energy();
+   } 
+    float frequency = pzem.frequency();
+    float pf = pzem.pf();
+    float DCV = 0;
+    float Apparent = 0;
+    float Reactive = 0;
+    float Vp_p = 0;
+    float Ip_p = 0;
+    float batteryPercent = 0;
+    float loadPercentage = 0;
+    for(int t=0; t<30; t++)
+    {
+    if(analogRead(34)>tmp)
+    {
+      tmp = analogRead(34);
+    }
+    }
 
-    // Apply control values
-    load_1 == 0? digitalWrite(load1, LOW) : digitalWrite(load1, HIGH);
-    load_2 == 0? digitalWrite(load2, LOW) : digitalWrite(load2, HIGH);
-    load_3 == 0? digitalWrite(load3, LOW) : digitalWrite(load3, HIGH);
-    load_4 == 0? digitalWrite(load4, LOW) : digitalWrite(load4, HIGH);
-    load_5 == 0? digitalWrite(load5, LOW) : digitalWrite(load5, HIGH);
-    load_6 == 0? digitalWrite(load6, LOW) : digitalWrite(load6, HIGH);  
+    DCV = tmp/4095.0*3.3;
+    tmp=0;
+    DCV = DCV * calibration;
+    Serial.println("DCV: "+ String(DCV));
+    Serial.println("DCV :"+String(analogRead(34)));
+    Serial.println("SOLAR :"+String(analogRead(35)));
+
+    if(isnan(voltage)){
+        Serial.println("Print Zeros");
+        voltage=0;
+        current=0;
+        load=0;
+        frequency=0;
+        pf=0;
+
+
+    } else if (isnan(current)) {
+        // Serial.println("Print -Error zero current here-");
+    } else if (isnan(load)) {
+        // Serial.println("Error reading power");
+    } else if (isnan(energy)) {
+        // Serial.println("Error reading energy");
+    } else if (isnan(frequency)) {
+        // Serial.println("Error reading frequency");
+    } else if (isnan(pf)) {
+        // Serial.println("Error reading power factor");
+    } else {
+
+        // Print the values to the Serial console
+        Serial.print("Voltage: ");      Serial.print(voltage);      Serial.println("V");
+        Serial.print("Current: ");      Serial.print(current);      Serial.println("A");
+        Serial.print("load: ");        Serial.print(load);        Serial.println("W");
+        Serial.print("Energy: ");       Serial.print(energy,3);     Serial.println("kWh");
+        Serial.print("Frequency: ");    Serial.print(frequency, 1); Serial.println("Hz");
+        Serial.print("PF: ");           Serial.println(pf);
+
+    }
+    float lowBattery = 0;
+    float highBattery = 0;
+
+    if (nominal.toInt() == 24)
+    {
+      lowBattery = 21.0;
+      highBattery = 27;
+      sol = 1200;
+      calibration = 19/2;
+    }
+
+    if (nominal.toInt() == 48)
+    {
+      lowBattery = 42.0;
+      highBattery = 54.0;
+      sol = 1500;
+      calibration = 19;
+    }
+
+    loadPercentage = constrain(float(((load)/(capacity.toFloat() * 800.0 )) *100.0 ), 0.0 , 100.0);
+    batteryPercent = map(DCV, lowBattery, highBattery, 0.0, 100.0);
+    batteryPercent = constrain(batteryPercent, 0.0 , 100.0);
+    Apparent = load/pf; 
+    Reactive = Apparent * (1-pf);
+
+    if(String(Apparent) == "nan")
+    {
+      Apparent = 0.00;
+      Reactive = 0.00;
+    }
+    Vp_p = voltage * sqrt(2);
+    Ip_p = current * sqrt(2);
+    Serial.println();
+    
+    
+    Serial.println("voltage :" + String(voltage));
+    Serial.println("current :" + String(current));
+    Serial.println("load :" + String(load));
+    Serial.println("energy :" + String(energy));
+    Serial.println("frequency :" + String(frequency));
+    Serial.println("pf :" + String(pf));
+
+
+    int tm = 4095;
+    for(int cnt = 0; cnt < 2500; cnt++)
+    {
+      
+      if(tm > analogRead(mainSense))
+      {
+          tm = analogRead(mainSense);
+      }
+    }
+    Serial.print("Mains: ");
+    Serial.println(tm);
+    Serial.println();
+    if(tm > 4000)
+    {
+      mainState = 0;
+    }
+    else
+    {
+      mainState = 1;
+    }
+
+  // Send new readings to database
+  if (Firebase.ready() && (millis() - sendDataPrevMillis > timerDelay || sendDataPrevMillis == 0)){
+    sendDataPrevMillis = millis();
+
+    Serial.println("devicePath: " + devicePath);
+    if(!devicePath.isEmpty())
+    {
+    Serial.println("Sending to cloud..");
+    // Generate sensor data
+    String values = String(voltage)+","+String(current)+","+String(load)+","+String(energy)+","+String(frequency)+","+String(pf)+","+String(mainState)+","+String(solarSense)+","+nominal+","+capacity+","+DCV+","+Apparent+","+Reactive+","+Vp_p+","+Ip_p+","+ batteryPercent+","+loadPercentage+","+String(analogRead(34))+","+""+","+String(power_control) + ","+ String(random (0,100000)) + "," + String(inverter_state);
+    Serial.printf("Set json... %s\n", Firebase.RTDB.setJSON(&fbdo, devicePath.c_str(), &json) ? "ok" : fbdo.errorReason().c_str());
+    json.set("data", values);
   }
-  
-  // Check for OTA updates every minute
-  if (millis() - lastOTACheck > 60000) { // 60000 ms = 1 minute
+  }
+
+  if (millis() - sendDataPrevMillis_2 > timerDelay_2 || sendDataPrevMillis_2 == 0){
+    sendDataPrevMillis_2 = millis();
+  String appData;
+  FirebaseJson jVal;
+  // user = "/"+user+"/state/";
+  // Serial.printf("Get json ref... %s\n", Firebase.RTDB.getJSON(&fbdo, "/device_data", &jVal) ? jVal.raw() : fbdo.errorReason().c_str());
+  Firebase.RTDB.getJSON(&fbdo, appPath, &jVal);
+  appData = jVal.raw();
+  Serial.println(appData);
+  DeserializationError error = deserializeJson(doc, appData);
+
+  // Test if parsing succeeds
+  if (error) {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.f_str());
+    return;
+  }
+  power_control = doc["power"];
+  energy_control = doc["energy"];
+  lastUserPower = doc["lastUserPower"];
+  lastUserEnergy = doc["lastUserEnergy"];
+
+  load_1 = doc["load_1"];
+  load_2 = doc["load_2"];
+  load_3 = doc["load_3"];
+  load_4 = doc["load_4"];
+  load_5 = doc["load_5"];
+  load_6 = doc["load_6"];
+
+
+  load_1 == 1? digitalWrite(load1,LOW) :  digitalWrite(load1,HIGH);
+  load_2 == 1? digitalWrite(load2,LOW) :  digitalWrite(load2,HIGH);
+  load_3 == 1? digitalWrite(load3,LOW) :  digitalWrite(load3,HIGH);
+  load_4 == 1? digitalWrite(load4,LOW) :  digitalWrite(load4,HIGH);
+  load_5 == 1? digitalWrite(load5,LOW) :  digitalWrite(load5,HIGH);
+  load_6 == 1? digitalWrite(load6,LOW) :  digitalWrite(load6,HIGH);
+
+  load_1 == 1? Serial.println("LOAD1 ON") :  Serial.println("LOAD1 OFF");
+  load_2 == 1? Serial.println("LOAD2 ON") :  Serial.println("LOAD2 OFF");
+  load_3 == 1? Serial.println("LOAD3 ON") :  Serial.println("LOAD3 OFF");
+  load_4 == 1? Serial.println("LOAD4 ON") :  Serial.println("LOAD4 OFF");
+  load_5 == 1? Serial.println("LOAD5 ON") :  Serial.println("LOAD5 OFF");
+  load_6 == 1? Serial.println("LOAD6 ON") :  Serial.println("LOAD6 OFF");
+
+  Serial.print("lastUserPower: "); Serial.println(lastUserPower);
+  Serial.print("lastUserEnergy: "); Serial.println(lastUserEnergy);
+  Serial.print("power_control: "); Serial.println(power_control);
+
+
+  if(temp != power_control)
+  {
+    temp = power_control;
+
+    if(power_control == 1 && !digitalRead(powerState)) 
+  {
+    pulse();
+    Serial.println("Power_control 1");
+  }
+  if (power_control == 0 && digitalRead(powerState))
+  {
+    pulse();
+    Serial.println("Power_control 0");
+  }
+
+  }
+  if((power_control == 1 && !digitalRead(powerState))||(power_control == 0 && digitalRead(powerState)))
+  {
+    // switched from device
+      Serial.println("Switched from Device!");
+      Serial.printf("Set jsonn... %s\n", Firebase.RTDB.setJSON(&fbdo, appPath.c_str(), &jsonn) ? "ok" : fbdo.errorReason().c_str());
+      jsonn.set("lastUserPower", "DEVICE SWITCH");
+      if(digitalRead(powerState))
+      {
+        jsonn.set("power", "1");
+      }
+      else
+      {
+       jsonn.set("power", "0"); 
+      }
+        
+  }
+
+  digitalRead(powerState)? inverter_state = true: inverter_state = false;
+  energy_control == 5? pzem.resetEnergy(): energy_control=1;
+  }
+
+    // Check for OTA updates every minute
+  if (millis() - lastOTACheck > 5000) { // 60000 ms = 1 minute
     lastOTACheck = millis();
     checkForOTAUpdates();
   }
+
+}
+
+void pulse()
+{
+  digitalWrite(inverterSwitch,HIGH);
+  delay(1000);
+  digitalWrite(inverterSwitch,LOW);
+}
+
+void checkButton(){
+  // check for button press
+      if( digitalRead(TRIGGER_PIN) == LOW ){
+        Serial.println("Button Pressed");
+        for(int m = 0; m<10; m++)
+        {
+          digitalWrite(led,HIGH);
+          delay(70);
+          digitalWrite(led,LOW);
+          delay(70);
+        }
+        ESP.restart();
+      }
+}
+
+String getValue(String data, char separator, int index) {
+  int found = 0;
+  int strIndex[] = { 0, -1 };
+  int maxIndex = data.length() - 1;
+  
+  for (int i = 0; i <= maxIndex && found <= index; i++) {
+    if (data.charAt(i) == separator || i == maxIndex) {
+      found++;
+      strIndex[0] = strIndex[1] + 1;
+      strIndex[1] = (i == maxIndex) ? i+1 : i;
+    }
+  }
+  return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
