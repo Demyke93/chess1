@@ -1,6 +1,5 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/hooks/use-toast";
 
 interface ParameterProps {
   data: {
@@ -24,16 +23,16 @@ interface ParameterProps {
     nominal_voltage?: number;
   };
   showAdvanced: boolean;
-  deviceCapacity: number; // Device capacity from Firebase in KVA
+  output_capacity: number; // Device capacity from Firebase in KVA
 }
 export const InverterParameters = ({
   data,
   showAdvanced,
-  deviceCapacity
+  output_capacity
 }: ParameterProps) => {
-  // Calculate system capacity as 75% of device capacity (KVA to KW) only if deviceCapacity is valid
-  const isValidCapacity = deviceCapacity && !isNaN(deviceCapacity) && deviceCapacity > 0;
-  const systemCapacity = isValidCapacity ? Math.round(deviceCapacity * 0.75 * 100) / 100 : 0;
+  // Calculate system capacity as 75% of device capacity (KVA to KW) only if output_capacity is valid
+  const isValidCapacity = output_capacity && !isNaN(output_capacity) && output_capacity > 0;
+  const systemCapacity = isValidCapacity ? Math.round(output_capacity * 0.75 * 100) / 100 : 0;
 
   // Convert system capacity to Watts for comparison with output_power only if valid
   const systemCapacityWatts = systemCapacity * 1000;
@@ -117,7 +116,7 @@ export const InverterParameters = ({
               />
             </div>
             <p className="text-xs text-gray-300">
-              Capacity: {isValidCapacity ? `${deviceCapacity} KVA (${systemCapacity} KW)` : 'N/A'} | 
+              Capacity: {isValidCapacity ? `${output_capacity} KVA (${systemCapacity} KW)` : 'N/A'} | 
               Load: {isValidCapacity ? `${loadPercentage}%` : 'N/A'}
             </p>
             <p className="text-xs text-gray-300">
