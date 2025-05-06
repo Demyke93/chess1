@@ -185,7 +185,7 @@ const Dashboard = () => {
       battery_percentage: deviceStateData.battery_percentage || 0,
       battery_voltage: deviceStateData.battery_voltage || 0,
       // Use device_capacity from Firebase or fallback to system's capacity
-      output_capacity: deviceStateData.device_capacity  || 0,
+      output_capacity:  0,
       output_voltage: deviceStateData.voltage || 0,
       output_power: deviceStateData.power || 0,
       // Use actual values from Firebase, no default fallbacks
