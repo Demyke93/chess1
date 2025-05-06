@@ -3,17 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from '@/components/ui/button';
-import { PowerConsumptionChart } from '@/components/inverter/PowerConsumptionChart';
-import { InverterDataDisplay } from '@/components/inverter/InverterDataDisplay';
 import { AddInverterSystem } from '@/components/inverter/AddInverterSystem';
 import { PowerSwitch } from '@/components/inverter/PowerSwitch';
-import { FirebaseConfigForm } from '@/components/inverter/FirebaseConfigForm';
-import { AddSharedInverter } from '@/components/inverter/AddSharedInverter';
-import { LoadControlPanel } from '@/components/inverter/LoadControlPanel';
-import { DeleteInverterSystem } from '@/components/inverter/DeleteInverterSystem';
 import { toast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Zap, Trash2, Database, Loader2 } from 'lucide-react';
 import { useIsMobile } from "@/hooks/use-mobile";
 import { subscribeToDeviceData, subscribeToControlStates } from "@/integrations/firebase/client";
 import { SystemSelector } from "./SystemSelector";
@@ -193,7 +185,7 @@ const Dashboard = () => {
       battery_percentage: deviceStateData.battery_percentage || 0,
       battery_voltage: deviceStateData.battery_voltage || 0,
       // Use device_capacity from Firebase or fallback to system's capacity
-      output_capacity: deviceStateData.device_capacity || selectedSystemData?.capacity || 0,
+      output_capacity: deviceStateData.device_capacity  || 0,
       output_voltage: deviceStateData.voltage || 0,
       output_power: deviceStateData.power || 0,
       // Use actual values from Firebase, no default fallbacks
