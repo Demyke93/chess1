@@ -32,7 +32,7 @@ export const InverterParameters = ({
 }: ParameterProps) => {
   // Calculate system capacity as 75% of device capacity (KVA to KW) only if output_capacity is valid
   const isValidCapacity = output_capacity && !isNaN(output_capacity) && output_capacity > 0;
-  const systemCapacity = 0;
+  const systemCapacity = isValidCapacity ? Math.round(output_capacity * 0.75 * 100) / 100 : 0;
 
   // Convert system capacity to Watts for comparison with output_power only if valid
   const systemCapacityWatts = systemCapacity * 1000;
@@ -116,7 +116,7 @@ export const InverterParameters = ({
               />
             </div>
             <p className="text-xs text-gray-300">
-              Capacity: {isValidCapacity ? `${output_capacity} KVA (${systemCapacity} KW)` : 'N/A'} | 
+              Capacity: {isValidCapacity ? `${output_capacity} KVA (${output_capacity*0.75} KW)` : 'N/A'} | 
               Load: {isValidCapacity ? `${loadPercentage}%` : 'N/A'}
             </p>
             <p className="text-xs text-gray-300">
