@@ -48,7 +48,7 @@ export const InverterDataDisplay = ({ inverterId, deviceData, firebaseData }: In
     if (firebaseData) {
       // Map Firebase data to our data format
       const data: ParsedData = {
-        voltage: firebaseData.voltage || 220,
+        voltage: firebaseData.voltage || 0,
         current: firebaseData.current || 0,
         // Use load from Firebase data instead of power
         load: firebaseData.load || 0,
