@@ -35,7 +35,7 @@ export function SystemInfoCard({
   if (!selectedSystemData) return null;
   
   // Use device_capacity from Firebase if available (in KVA)
-  const deviceCapacity = firebaseData?.device_capacity || selectedSystemData.capacity || "N/A";
+  const deviceCapacity = firebaseData?.device_capacity || "N/A";
   
   // Calculate system capacity as 75% of device capacity (KVA to KW)
   const systemCapacity = deviceCapacity !== "N/A" 
