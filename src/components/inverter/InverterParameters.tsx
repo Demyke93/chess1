@@ -1,4 +1,6 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "@/hooks/use-toast";
 
 interface ParameterProps {
   data: {
@@ -29,27 +31,30 @@ export const InverterParameters = ({
   showAdvanced,
   deviceCapacity
 }: ParameterProps) => {
-  // Calculate system capacity as 75% of device capacity (KVA to KW)
-  const systemCapacity = deviceCapacity ? Math.round(deviceCapacity * 0.75 * 100) / 100 : 0;
+  // Calculate system capacity as 75% of device capacity (KVA to KW) only if deviceCapacity is valid
+  const isValidCapacity = deviceCapacity && !isNaN(deviceCapacity) && deviceCapacity > 0;
+  const systemCapacity = isValidCapacity ? Math.round(deviceCapacity * 0.75 * 100) / 100 : 0;
 
-  // Convert system capacity to Watts for comparison with output_power
+  // Convert system capacity to Watts for comparison with output_power only if valid
   const systemCapacityWatts = systemCapacity * 1000;
 
   // Use load (real power) value from data
   const currentPower = parseFloat(data.real_power?.toString() || data.output_power?.toString() || '0');
 
-  console.log("InverterParameters power data (FIXED):", {
+  console.log("InverterParameters power data:", {
     realPower: data.real_power,
     outputPower: data.output_power,
     currentPower: currentPower,
-    systemCapacityWatts: systemCapacityWatts
+    systemCapacityWatts: systemCapacityWatts,
+    isValidCapacity: isValidCapacity
   });
 
-  // Set the surge threshold at 80% of system capacity
-  const isPowerSurge = systemCapacityWatts ? currentPower / systemCapacityWatts > 0.8 : false;
+  // Set the surge threshold at 80% of system capacity (only if we have a valid capacity)
+  const isPowerSurge = isValidCapacity ? currentPower / systemCapacityWatts > 0.8 : false;
 
   // Calculate load percentage based on actual power consumption and system capacity
-  const loadPercentage = systemCapacityWatts 
+  // Show 0% if we don't have valid capacity data
+  const loadPercentage = isValidCapacity && systemCapacityWatts > 0
     ? Math.min(Math.round((currentPower / systemCapacityWatts) * 100), 100) 
     : 0;
 
@@ -112,7 +117,8 @@ export const InverterParameters = ({
               />
             </div>
             <p className="text-xs text-gray-300">
-              Capacity: {deviceCapacity ?? 'N/A'} KVA ({systemCapacity} KW) | Load: {loadPercentage}%
+              Capacity: {isValidCapacity ? `${deviceCapacity} KVA (${systemCapacity} KW)` : 'N/A'} | 
+              Load: {isValidCapacity ? `${loadPercentage}%` : 'N/A'}
             </p>
             <p className="text-xs text-gray-300">
               Voltage: {data.output_voltage?.toFixed(1) ?? 'N/A'}V
