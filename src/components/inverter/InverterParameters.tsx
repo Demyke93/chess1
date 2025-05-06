@@ -116,7 +116,7 @@ export const InverterParameters = ({
               />
             </div>
             <p className="text-xs text-gray-300">
-              Capacity: {isValidCapacity ? `${output_capacity} KVA (${output_capacity*0.75} KW)` : 'N/A'} | 
+              Capacity: {isValidCapacity ? `${output_capacity} KVA (${output_capacity} KW)` : 'N/A'} | 
               Load: {isValidCapacity ? `${loadPercentage}%` : 'N/A'}
             </p>
             <p className="text-xs text-gray-300">
