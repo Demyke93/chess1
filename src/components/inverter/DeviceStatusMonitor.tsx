@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Wifi, WifiOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -180,6 +179,7 @@ export const DeviceStatusMonitor = ({
         if (lastSeenTime > threeMinutesAgo) {
           // Only update the status if we're currently offline or if it's been stable
           if (!isOnline || (Date.now() - lastStatusChangeTimeRef.current) > 30000) {
+            console.log(`Setting inverter ${inverterId} online based on database last_seen timestamp (${lastSeen})`);
             setIsOnline(true);
             setLastUpdateTime(lastSeenTime);
             lastStatusChangeTimeRef.current = Date.now();
@@ -189,9 +189,10 @@ export const DeviceStatusMonitor = ({
           // Use a timer to debounce the state change
           if (!offlineStateTimerRef.current) {
             offlineStateTimerRef.current = window.setTimeout(() => {
-              console.log(`Device ${inverterId} considered offline after validation period`);
+              console.log(`Setting inverter ${inverterId} offline - last_seen timestamp too old (${lastSeen})`);
               setIsOnline(false);
               lastStatusChangeTimeRef.current = Date.now();
+              statusStabilityCountRef.current = 0;
               offlineStateTimerRef.current = null;
             }, 10000); // Wait 10 seconds before confirming offline state
           }

@@ -136,25 +136,30 @@ const logDataIfValid = (systemId: string, data: any) => {
  * @param inverterId The inverter database ID (UUID)
  * @returns Promise<boolean> True if successful
  */
-export const updateInverterLastSeen = async (inverterId: string): Promise<boolean> => {
+export const updateInverterLastSeen = async (inverterId: string) => {
   try {
-    console.log(`Updating last seen timestamp for inverter ID: ${inverterId}`);
+    if (!inverterId) {
+      console.error("Invalid inverterId provided to updateInverterLastSeen");
+      return false;
+    }
+
+    const currentTime = new Date().toISOString();
     
-    // Update the last_seen field directly using the inverterId (UUID)
+    // Update the last_seen value in Supabase
     const { error } = await supabase
       .from('inverter_systems')
-      .update({ last_seen: new Date().toISOString() })
+      .update({ last_seen: currentTime })
       .eq('id', inverterId);
-    
+      
     if (error) {
-      console.error(`Error updating last seen for inverter ${inverterId}:`, error);
+      console.error(`Error updating last_seen for inverter ${inverterId}:`, error);
       return false;
     }
     
-    console.log(`Successfully updated last_seen for inverter ID: ${inverterId}`);
+    console.log(`Successfully updated last_seen for inverter ${inverterId} to ${currentTime}`);
     return true;
-  } catch (error) {
-    console.error(`Exception in updateInverterLastSeen for ${inverterId}:`, error);
+  } catch (err) {
+    console.error("Error in updateInverterLastSeen:", err);
     return false;
   }
 };
@@ -166,23 +171,25 @@ export const updateInverterLastSeen = async (inverterId: string): Promise<boolea
  */
 export const getInverterLastSeen = async (inverterId: string): Promise<string | null> => {
   try {
-    console.log(`Fetching last seen timestamp for inverter ID: ${inverterId}`);
+    if (!inverterId) {
+      console.error("Invalid inverterId provided to getInverterLastSeen");
+      return null;
+    }
     
     const { data, error } = await supabase
       .from('inverter_systems')
       .select('last_seen')
       .eq('id', inverterId)
-      .single();
-    
-    if (error || !data) {
-      console.error(`Error fetching last seen for inverter ${inverterId}:`, error);
+      .maybeSingle();
+      
+    if (error) {
+      console.error(`Error fetching last_seen for inverter ${inverterId}:`, error);
       return null;
     }
     
-    console.log(`Retrieved last_seen for inverter ${inverterId}: ${data.last_seen}`);
-    return data.last_seen;
-  } catch (error) {
-    console.error(`Exception in getInverterLastSeen for ${inverterId}:`, error);
+    return data?.last_seen || null;
+  } catch (err) {
+    console.error("Error in getInverterLastSeen:", err);
     return null;
   }
 };

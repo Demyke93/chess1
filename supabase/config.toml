@@ -1,1 +1,5 @@
+
 project_id = "hzqnccsmejplilhmisgu"
+
+[functions.firebase-last-seen]
+verify_jwt = false 
