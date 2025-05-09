@@ -6,7 +6,7 @@ interface InverterDataLog {
   power: number;
   battery_percentage: number;
   battery_voltage: number;
-  voltage: number;
+  output_voltage: number; // Changed from 'voltage' to match column name
   current: number;
   mains_present: boolean;
   solar_present: boolean;
@@ -31,7 +31,7 @@ export const logInverterData = async (
       power,
       battery_percentage,
       battery_voltage,
-      voltage,
+      output_voltage,
       current,
       mains_present,
       solar_present,
@@ -46,8 +46,7 @@ export const logInverterData = async (
       output_power: typeof power === 'string' ? parseFloat(power) : power,
       battery_percentage,
       battery_voltage,
-      voltage,
-      output_voltage: voltage, // Fixed: use voltage instead of undefined output_voltage
+      output_voltage,
       frequency,
       power_factor,
       energy_kwh: energy,
@@ -120,7 +119,7 @@ const logDataIfValid = (systemId: string, data: any) => {
       power: typeof powerValue === 'string' ? parseFloat(powerValue) : Number(powerValue),
       battery_percentage: data.battery_percentage || 0,
       battery_voltage: data.battery_voltage || 0,
-      voltage: data.voltage || 0,
+      output_voltage: data.voltage || 0,
       current: data.current || 0,
       mains_present: data.mains_present === true || data.mains_present === 1,
       solar_present: data.solar_present === true || data.solar_present === 1,

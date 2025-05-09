@@ -91,6 +91,7 @@ export function SystemInfoCard({
                 <DeviceStatusMonitor
                   inverterId={selectedSystemData.id}
                   deviceData={deviceData}
+                  refreshInterval={3000} // Check more frequently for online status
                 />
               </div>
             </div>
