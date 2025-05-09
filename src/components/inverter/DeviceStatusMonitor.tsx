@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Wifi, WifiOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +19,6 @@ export const DeviceStatusMonitor = ({
   refreshInterval = 5000, // Extended to 5 seconds for more reliable status
 }: DeviceStatusMonitorProps) => {
   const [isOnline, setIsOnline] = useState<boolean>(false);
-  const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
   const [lastDbUpdateTime, setLastDbUpdateTime] = useState<string | null>(null);
   const lastRandomValueRef = useRef<number>(0);
   const [systemId, setSystemId] = useState<string | null>(null);
@@ -44,7 +44,6 @@ export const DeviceStatusMonitor = ({
       console.log(`DeviceStatusMonitor: inverterId changed from ${inverterIdRef.current} to ${inverterId}, resetting state`);
       inverterIdRef.current = inverterId;
       setIsOnline(false);
-      setLastUpdateTime(0);
       setLastDbUpdateTime(null);
       setSystemId(null);
       lastRandomValueRef.current = 0;
@@ -104,13 +103,11 @@ export const DeviceStatusMonitor = ({
               // If last_seen is recent (within the past 3 minutes), consider the device online
               const threeMinutesAgo = Date.now() - 180000;
               if (lastSeenDate > threeMinutesAgo) {
-                setLastUpdateTime(lastSeenDate);
                 setIsOnline(true);
                 initialLoadRef.current = false;
               } else {
                 // If last seen is more than three minutes ago, device should be offline
                 setIsOnline(false);
-                setLastUpdateTime(lastSeenDate);
               }
             }
           }
@@ -181,7 +178,6 @@ export const DeviceStatusMonitor = ({
           if (!isOnline || (Date.now() - lastStatusChangeTimeRef.current) > 30000) {
             console.log(`Setting inverter ${inverterId} online based on database last_seen timestamp (${lastSeen})`);
             setIsOnline(true);
-            setLastUpdateTime(lastSeenTime);
             lastStatusChangeTimeRef.current = Date.now();
           }
         } else if (isOnline) {
@@ -241,33 +237,6 @@ export const DeviceStatusMonitor = ({
         if (currentRandomValue !== lastRandomValueRef.current) {
           console.log(`Random value changed from ${lastRandomValueRef.current} to ${currentRandomValue} for inverter ${inverterId}`);
           lastRandomValueRef.current = currentRandomValue;
-          const now = Date.now();
-          
-          // Debounce online state changes
-          if (!isOnline) {
-            if (!stateChangeDebounceTimerRef.current) {
-              stateChangeDebounceTimerRef.current = window.setTimeout(() => {
-                setLastUpdateTime(now);
-                setIsOnline(true);
-                hasRandomValueChangedRef.current = true;
-                initialLoadRef.current = false;
-                lastStatusChangeTimeRef.current = Date.now();
-                stateChangeDebounceTimerRef.current = null;
-                
-                // Reset the offline timer if it exists
-                if (offlineStateTimerRef.current) {
-                  clearTimeout(offlineStateTimerRef.current);
-                  offlineStateTimerRef.current = null;
-                }
-              }, 5000); // Wait 5 seconds before confirming online state
-            }
-          } else {
-            // Already online, just update the timestamp
-            setLastUpdateTime(now);
-          }
-          
-          // We no longer update last_seen timestamp directly here
-          // The cron job will handle this through the firebase-last-seen edge function
           
           // Log data to Supabase if we have system_id
           if (systemId && values.length >= 21) {
@@ -298,56 +267,7 @@ export const DeviceStatusMonitor = ({
     } catch (error) {
       console.error(`Error parsing device data for ${inverterId}:`, error);
     }
-  }, [deviceData, systemId, inverterId, isOnline]);
-
-  // Check if device is online by checking time since last update - this is system specific
-  useEffect(() => {
-    // Only run this check if we're still on the same inverterId
-    if (inverterIdRef.current !== inverterId) return;
-    
-    const timer = setInterval(() => {
-      // Update the time ago display even if no new data is received
-      // This forces a re-render to keep the "time ago" counter going
-      const now = Date.now();
-      const timeSinceLastUpdate = now - lastUpdateTime;
-      const timeSinceLastFetch = now - lastFetchTimeRef.current;
-      
-      // If we haven't fetched for too long, trigger a fetch now
-      if (timeSinceLastFetch > 60000) { // If last fetch was more than 60s ago
-        getInverterLastSeen(inverterId).then(lastSeen => {
-          if (lastSeen) {
-            setLastDbUpdateTime(lastSeen);
-            lastFetchTimeRef.current = now;
-            // Force component to re-render to update the time ago display
-            setLastUpdateTime(prev => prev); 
-          }
-        });
-      }
-      
-      // Consider device offline if no update for 3x the refresh interval and the device was previously shown as online
-      if (isOnline && lastUpdateTime > 0 && timeSinceLastUpdate > refreshInterval * 6) {
-        // To prevent oscillation, only set offline if we haven't changed state recently
-        if (!offlineStateTimerRef.current && (now - lastStatusChangeTimeRef.current) > 30000) {
-          offlineStateTimerRef.current = window.setTimeout(() => {
-            console.log(`Setting inverter ${inverterId} offline due to inactivity: ${timeSinceLastUpdate}ms since last update`);
-            setIsOnline(false);
-            lastStatusChangeTimeRef.current = now;
-            statusStabilityCountRef.current = 0;
-            offlineStateTimerRef.current = null;
-          }, 10000); // Wait 10 seconds before changing to offline
-        }
-      }
-      
-      // Force a re-render every minute to keep the time ago display updated
-      // This is important especially when the app is inactive or signed out
-      if (now % 60000 < 1000) {
-        // Force component to re-render to update the time ago display
-        setLastUpdateTime(prev => prev);
-      }
-    }, 1000); // Check every second
-
-    return () => clearInterval(timer);
-  }, [refreshInterval, lastUpdateTime, inverterId, isOnline]);
+  }, [deviceData, systemId, inverterId]);
 
   // Subscribe to Firebase device data changes
   useEffect(() => {
@@ -383,45 +303,6 @@ export const DeviceStatusMonitor = ({
             console.log(`Firebase: Random value changed from ${lastRandomValueRef.current} to ${currentRandomValue} for inverter ${inverterId}`);
             lastRandomValueRef.current = currentRandomValue;
             pendingFirebaseUpdateRef.current = true;
-            const now = Date.now();
-            
-            // Immediately mark the device as online if random value changes (with reduced debouncing)
-            if (!isOnline) {
-              // Set online with a short debounce (was 5000ms, now 2000ms)
-              if (!stateChangeDebounceTimerRef.current) {
-                console.log(`Starting timer to set inverter ${inverterId} online due to Firebase update`);
-                stateChangeDebounceTimerRef.current = window.setTimeout(() => {
-                  console.log(`Setting inverter ${inverterId} online due to Firebase update`);
-                  setLastUpdateTime(now);
-                  setIsOnline(true);
-                  hasRandomValueChangedRef.current = true;
-                  initialLoadRef.current = false;
-                  lastStatusChangeTimeRef.current = now;
-                  stateChangeDebounceTimerRef.current = null;
-                  pendingFirebaseUpdateRef.current = false;
-                  
-                  // Reset the offline timer if it exists
-                  if (offlineStateTimerRef.current) {
-                    clearTimeout(offlineStateTimerRef.current);
-                    offlineStateTimerRef.current = null;
-                  }
-                }, 2000); // Reduced wait time for better responsiveness
-              }
-            } else {
-              // Already online, just update the timestamp
-              setLastUpdateTime(now);
-              pendingFirebaseUpdateRef.current = false;
-              statusStabilityCountRef.current += 1;
-              
-              // Reset the offline timer if it exists
-              if (offlineStateTimerRef.current) {
-                clearTimeout(offlineStateTimerRef.current);
-                offlineStateTimerRef.current = null;
-              }
-            }
-            
-            // We no longer call updateInverterLastSeen here
-            // The cron job will handle updating last_seen based on Firebase changes
             
             // Log Firebase data to Supabase
             if (systemId && data) {
@@ -471,40 +352,6 @@ export const DeviceStatusMonitor = ({
           }
           
           console.log(`Received data change for ${systemId} (inverter: ${inverterId}) on channel ${channelName}:`, payload);
-          
-          // Ignore first update after system change
-          if (!ignoredFirstUpdateRef.current) {
-            ignoredFirstUpdateRef.current = true;
-            console.log(`Ignoring first Supabase update for ${inverterId} to prevent false online status`);
-            return;
-          }
-          
-          const now = Date.now();
-          
-          // Debounce state changes to prevent oscillation
-          if (!isOnline) {
-            if (!stateChangeDebounceTimerRef.current && (now - lastStatusChangeTimeRef.current) > 15000) {
-              stateChangeDebounceTimerRef.current = window.setTimeout(() => {
-                setLastUpdateTime(now);
-                setIsOnline(true);
-                hasRandomValueChangedRef.current = true;
-                initialLoadRef.current = false;
-                lastStatusChangeTimeRef.current = now;
-                stateChangeDebounceTimerRef.current = null;
-              }, 5000);
-            }
-          } else {
-            setLastUpdateTime(now);
-            
-            // Reset the offline timer if it exists
-            if (offlineStateTimerRef.current) {
-              clearTimeout(offlineStateTimerRef.current);
-              offlineStateTimerRef.current = null;
-            }
-          }
-          
-          // We no longer call updateInverterLastSeen here
-          // The cron job will handle updating last_seen based on Supabase data changes
         }
       )
       .subscribe((status) => {
@@ -528,15 +375,11 @@ export const DeviceStatusMonitor = ({
         offlineStateTimerRef.current = null;
       }
     };
-  }, [systemId, inverterId, isOnline]);
+  }, [systemId, inverterId]);
 
   const getTimeAgo = () => {
-    // If we have a real-time update, use it
-    if (lastUpdateTime > 0) {
-      return timeAgo(lastUpdateTime);
-    }
-    // Otherwise fall back to the database last_seen if available
-    else if (lastDbUpdateTime) {
+    // Just use the database last_seen if available
+    if (lastDbUpdateTime) {
       return timeAgo(new Date(lastDbUpdateTime).getTime());
     }
     return "";
@@ -558,7 +401,7 @@ export const DeviceStatusMonitor = ({
         <>
           <Wifi className="h-4 w-4 text-green-500" />
           <span className="text-xs text-green-400">Online</span>
-          {(lastUpdateTime > 0 || lastDbUpdateTime) && (
+          {lastDbUpdateTime && (
             <span className="text-xs text-gray-400">
               • Last update: {getTimeAgo()}
             </span>
@@ -568,7 +411,7 @@ export const DeviceStatusMonitor = ({
         <>
           <WifiOff className="h-4 w-4 text-red-500" />
           <span className="text-xs text-red-400">Offline</span>
-          {(lastUpdateTime > 0 || lastDbUpdateTime) && (
+          {lastDbUpdateTime && (
             <span className="text-xs text-gray-400">
               • Last seen: {getTimeAgo()}
             </span>

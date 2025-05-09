@@ -50,7 +50,7 @@ export const logInverterData = async (
       output_voltage: voltage, // Fixed: use voltage instead of undefined output_voltage
       frequency,
       power_factor,
-      energy: energy,
+      energy_kwh: energy,
       mains_present,
       solar_present,
       timestamp: new Date().toISOString()
