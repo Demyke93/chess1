@@ -2,6 +2,9 @@
 import { DeviceStatusMonitor } from "@/components/inverter/DeviceStatusMonitor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatWestAfricaTime, timeAgo } from "@/utils/westAfricaTime";
+import { useState, useEffect } from "react";
+import { getInverterLastSeen } from "@/utils/dataLogging";
 
 interface InverterSystem {
   id: string;

@@ -23,7 +23,6 @@ export const DeviceStatusMonitor = ({
   const [systemId, setSystemId] = useState<string | null>(null);
   const lastFetchTimeRef = useRef<number>(Date.now());
   const inverterIdRef = useRef<string>(inverterId);
-  const offlineStatusTimerRef = useRef<number | null>(null);
   
   // The threshold in milliseconds for considering a device offline (15 seconds)
   const OFFLINE_THRESHOLD = 15000;
@@ -35,12 +34,6 @@ export const DeviceStatusMonitor = ({
       setIsOnline(false);
       setLastDbUpdateTime(null);
       setSystemId(null);
-      
-      // Clear any existing timers
-      if (offlineStatusTimerRef.current) {
-        window.clearTimeout(offlineStatusTimerRef.current);
-        offlineStatusTimerRef.current = null;
-      }
     }
   }, [inverterId]);
 
@@ -90,33 +83,46 @@ export const DeviceStatusMonitor = ({
   useEffect(() => {
     if (!inverterId) return;
     
-    console.log(`Setting up last seen polling for inverter ${inverterId}`);
+    console.log(`Setting up last seen polling for inverter ${inverterId} with interval ${refreshInterval}ms`);
     
     const fetchLastSeen = async () => {
-      if (inverterIdRef.current !== inverterId) return;
-      
-      lastFetchTimeRef.current = Date.now();
-      
-      const lastSeen = await getInverterLastSeen(inverterId);
-      
-      if (lastSeen) {
-        console.log(`Fetched last seen for inverter ${inverterId}: ${lastSeen}`);
-        setLastDbUpdateTime(lastSeen);
+      try {
+        if (inverterIdRef.current !== inverterId) return;
         
-        // Check if this timestamp is recent enough to consider online
-        const lastSeenTime = new Date(lastSeen).getTime();
-        const now = Date.now();
+        lastFetchTimeRef.current = Date.now();
         
-        if (now - lastSeenTime < OFFLINE_THRESHOLD) {
-          if (!isOnline) {
-            console.log(`Setting inverter ${inverterId} online based on recent last_seen (${lastSeen})`);
-            setIsOnline(true);
+        // Directly query the database for the most up-to-date last_seen timestamp
+        const { data, error } = await supabase
+          .from('inverter_systems')
+          .select('last_seen')
+          .eq('id', inverterId)
+          .single();
+          
+        if (error) throw error;
+        
+        if (data && data.last_seen) {
+          console.log(`Fetched last seen for inverter ${inverterId}: ${data.last_seen}`);
+          setLastDbUpdateTime(data.last_seen);
+          
+          // Check if this timestamp is recent enough to consider online
+          const lastSeenTime = new Date(data.last_seen).getTime();
+          const now = Date.now();
+          
+          if (now - lastSeenTime < OFFLINE_THRESHOLD) {
+            if (!isOnline) {
+              console.log(`Setting inverter ${inverterId} online based on recent last_seen (${data.last_seen})`);
+              setIsOnline(true);
+            }
+          } else {
+            // If it was online but now should be offline, update state
+            if (isOnline) {
+              console.log(`Setting inverter ${inverterId} offline - last_seen too old (${data.last_seen}), ${now - lastSeenTime}ms > ${OFFLINE_THRESHOLD}ms`);
+              setIsOnline(false);
+            }
           }
-        } else if (isOnline) {
-          // If it was online but now should be offline, update state
-          console.log(`Setting inverter ${inverterId} offline - last_seen too old (${lastSeen})`);
-          setIsOnline(false);
         }
+      } catch (error) {
+        console.error(`Error fetching last seen for inverter ${inverterId}:`, error);
       }
     };
     
@@ -128,10 +134,6 @@ export const DeviceStatusMonitor = ({
     
     return () => {
       clearInterval(interval);
-      
-      if (offlineStatusTimerRef.current) {
-        clearTimeout(offlineStatusTimerRef.current);
-      }
     };
   }, [inverterId, refreshInterval, isOnline]);
 
@@ -142,16 +144,10 @@ export const DeviceStatusMonitor = ({
     console.log(`Setting up Firebase subscription for system ID: ${systemId} (inverter: ${inverterId})`);
     
     // Subscribe to Firebase data updates
-    const unsubscribe = subscribeToDeviceData(systemId, (data) => {
-      if (inverterIdRef.current !== inverterId) return;
-      
+    const unsubscribe = subscribeToDeviceData(systemId, () => {
+      // We no longer update last_seen directly from client-side
+      // We only rely on the Supabase edge function for last_seen updates
       console.log(`Received Firebase data update for system: ${systemId}, inverter: ${inverterId}`);
-      
-      if (data) {
-        // When we receive Firebase data, the device is definitely online
-        // But we'll let the last_seen timestamp in the database be the source of truth
-        // for consistency across clients
-      }
     });
     
     // Return cleanup function
@@ -160,37 +156,6 @@ export const DeviceStatusMonitor = ({
       unsubscribe();
     };
   }, [systemId, inverterId]);
-
-  // Effect to check last seen timestamp regularly and update online status
-  useEffect(() => {
-    if (!lastDbUpdateTime) return;
-    
-    const checkOnlineStatus = () => {
-      const lastUpdateTime = new Date(lastDbUpdateTime).getTime();
-      const currentTime = Date.now();
-      const timeSinceUpdate = currentTime - lastUpdateTime;
-      
-      // If more than OFFLINE_THRESHOLD milliseconds have passed since the last update,
-      // consider the device offline
-      if (timeSinceUpdate > OFFLINE_THRESHOLD) {
-        if (isOnline) {
-          console.log(`Setting inverter ${inverterId} offline - no update in ${timeSinceUpdate}ms`);
-          setIsOnline(false);
-        }
-      } else if (!isOnline) {
-        console.log(`Setting inverter ${inverterId} online - recent update ${timeSinceUpdate}ms ago`);
-        setIsOnline(true);
-      }
-    };
-    
-    // Check immediately
-    checkOnlineStatus();
-    
-    // Set up interval to check regularly
-    const interval = setInterval(checkOnlineStatus, 2000);
-    
-    return () => clearInterval(interval);
-  }, [lastDbUpdateTime, isOnline, inverterId]);
 
   const getTimeAgo = () => {
     if (lastDbUpdateTime) {
