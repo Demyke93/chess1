@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
@@ -127,40 +128,6 @@ const logDataIfValid = (systemId: string, data: any) => {
       power_factor: data.power_factor || 0,
       energy: data.energy || 0
     });
-  }
-};
-
-/**
- * Update the last seen timestamp for a specific inverter system,
- * using the actual database ID for the record (not system_id)
- * @param inverterId The inverter database ID (UUID)
- * @returns Promise<boolean> True if successful
- */
-export const updateInverterLastSeen = async (inverterId: string) => {
-  try {
-    if (!inverterId) {
-      console.error("Invalid inverterId provided to updateInverterLastSeen");
-      return false;
-    }
-
-    const currentTime = new Date().toISOString();
-    
-    // Update the last_seen value in Supabase
-    const { error } = await supabase
-      .from('inverter_systems')
-      .update({ last_seen: currentTime })
-      .eq('id', inverterId);
-      
-    if (error) {
-      console.error(`Error updating last_seen for inverter ${inverterId}:`, error);
-      return false;
-    }
-    
-    console.log(`Successfully updated last_seen for inverter ${inverterId} to ${currentTime}`);
-    return true;
-  } catch (err) {
-    console.error("Error in updateInverterLastSeen:", err);
-    return false;
   }
 };
 

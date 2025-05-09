@@ -3,7 +3,7 @@ import { Wifi, WifiOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatWestAfricaTime, timeAgo } from "@/utils/westAfricaTime";
 import { subscribeToDeviceData } from "@/integrations/firebase/client";
-import { logInverterData, updateInverterLastSeen, getInverterLastSeen } from "@/utils/dataLogging";
+import { logInverterData, getInverterLastSeen } from "@/utils/dataLogging";
 import { toast } from "@/hooks/use-toast";
 
 interface DeviceStatusMonitorProps {
@@ -266,15 +266,8 @@ export const DeviceStatusMonitor = ({
             setLastUpdateTime(now);
           }
           
-          // Update the last_seen timestamp in the database FOR THIS SPECIFIC INVERTER
-          updateInverterLastSeen(inverterId)
-            .then(success => {
-              if (success) {
-                console.log(`Last seen timestamp updated for inverter ${inverterId}`);
-              } else {
-                console.error(`Failed to update last seen timestamp for inverter ${inverterId}`);
-              }
-            });
+          // We no longer update last_seen timestamp directly here
+          // The cron job will handle this through the firebase-last-seen edge function
           
           // Log data to Supabase if we have system_id
           if (systemId && values.length >= 21) {
@@ -427,15 +420,8 @@ export const DeviceStatusMonitor = ({
               }
             }
             
-            // Update the last_seen in the database FOR THIS SPECIFIC INVERTER by UUID
-            updateInverterLastSeen(inverterId)
-              .then(success => {
-                if (success) {
-                  console.log(`Last seen timestamp updated for inverter ${inverterId} via Firebase`);
-                } else {
-                  console.error(`Failed to update last seen timestamp for inverter ${inverterId} via Firebase`);
-                }
-              });
+            // We no longer call updateInverterLastSeen here
+            // The cron job will handle updating last_seen based on Firebase changes
             
             // Log Firebase data to Supabase
             if (systemId && data) {
@@ -517,15 +503,8 @@ export const DeviceStatusMonitor = ({
             }
           }
           
-          // Update the last_seen in the database specifically for this inverter using its UUID
-          updateInverterLastSeen(inverterId)
-            .then(success => {
-              if (success) {
-                console.log(`Last seen timestamp updated for inverter ${inverterId} via Supabase`);
-              } else {
-                console.error(`Failed to update last seen timestamp for inverter ${inverterId} via Supabase`);
-              }
-            });
+          // We no longer call updateInverterLastSeen here
+          // The cron job will handle updating last_seen based on Supabase data changes
         }
       )
       .subscribe((status) => {
